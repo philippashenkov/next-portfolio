@@ -165,7 +165,7 @@ export default function ThreeScene() {
       const colorCss = `#${colorHex.toString(16).padStart(6,'0')}`;
       const g = new THREE.Group();
       const textTex = makeTextTexture(symbol, colorCss);
-  const textMat = new THREE.SpriteMaterial({ map: textTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+      const textMat = new THREE.SpriteMaterial({ map: textTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
       const text = new THREE.Sprite(textMat);
       text.scale.setScalar(0.22);
       const halo = glowSprite(colorHex, 0.28);
@@ -178,9 +178,9 @@ export default function ThreeScene() {
   const ringMat = new THREE.SpriteMaterial({ map: ringTex, transparent: true, depthWrite: false, opacity: 0.0, blending: THREE.AdditiveBlending });
       const ring = new THREE.Sprite(ringMat);
       ring.scale.setScalar(0.18);
-      g.add(ring);
+  g.add(ring);
       disposables.push(ringTex, ringMat);
-      return { group: g, ping: ring };
+  return { group: g, ping: ring, text };
     }
 
     // symbols and colors
@@ -275,6 +275,7 @@ export default function ThreeScene() {
       node: THREE.Group; // contains symbol + halo
       sym: THREE.Group; // the symbol group returned by makeSymbolNode().group
       ping: THREE.Sprite;
+      textSprite: THREE.Sprite;
       tail: THREE.Sprite;
       prevAngle: number;
       speed: number;
@@ -282,8 +283,21 @@ export default function ThreeScene() {
       time: number;
       color: number;
       radius: number;
+      // DOM overlay for header-overlap case
+      dom: HTMLSpanElement;
+      symbol: string;
     };
-    const sats: SatState[] = [];
+  const sats: SatState[] = [];
+  // Create top-level HTML overlay attached to body to escape stacking contexts
+  const domOverlay = document.createElement('div');
+  domOverlay.style.position = 'fixed';
+  domOverlay.style.left = '0';
+  domOverlay.style.top = '0';
+  domOverlay.style.width = '100vw';
+  domOverlay.style.height = '100vh';
+  domOverlay.style.pointerEvents = 'none';
+  domOverlay.style.zIndex = '999999999';
+  document.body.appendChild(domOverlay);
     for (let i = 0; i < satCount; i++) {
       // Plane normal via Fibonacci sphere
       const t = (i + 0.5) / satCount;
@@ -317,11 +331,25 @@ export default function ThreeScene() {
 
       // Create symbol node
       const color = colors[i % colors.length];
-      const { group: symGroup, ping } = makeSymbolNode(symbols[i % symbols.length], color);
+  const symbol = symbols[i % symbols.length];
+  const { group: symGroup, ping, text } = makeSymbolNode(symbol, color);
       const node = new THREE.Group();
       node.add(symGroup);
       node.position.set(radius, 0, 0); // on X axis of the plane's XY ring
       rotator.add(node);
+
+  // DOM element for overlay rendering above header when overlapping
+  const span = document.createElement('span');
+  span.textContent = symbol;
+  span.style.position = 'fixed';
+  span.style.left = '0';
+  span.style.top = '0';
+  span.style.transform = 'translate(-9999px,-9999px)';
+  span.style.font = 'bold 14px Orbitron, Arial, Helvetica, sans-serif';
+  span.style.color = `#${color.toString(16).padStart(6,'0')}`;
+  span.style.textShadow = `0 0 6px rgba(51,224,255,0.9), 0 0 12px rgba(51,224,255,0.6)`;
+  span.style.userSelect = 'none';
+  domOverlay.appendChild(span);
 
       // Tail sprite lives in plane space so it lags behind orbit
       const tail = glowSprite(color, 0.16);
@@ -336,14 +364,17 @@ export default function ThreeScene() {
         rotator,
         node,
         sym: symGroup,
-        ping,
+  ping,
+  textSprite: text,
         tail,
         prevAngle: rotator.rotation.z,
         speed: 0.35 + (i % 6) * 0.08,
         spin: 0.8 + (i % 5) * 0.25,
         time: Math.random() * 10,
         color,
-        radius,
+  radius,
+  dom: span,
+  symbol,
       });
     }
 
@@ -359,7 +390,11 @@ export default function ThreeScene() {
       earthGroup.rotation.y += 0.24 * dt;
       stars.rotation.y += 0.1 * dt;
 
-      sats.forEach((s) => {
+  // locate header (cache per frame, cheap)
+  const headerEl = document.querySelector('header, nav, [role="banner"]') as HTMLElement | null;
+  const headerBottom = headerEl ? headerEl.getBoundingClientRect().bottom : 80;
+
+  sats.forEach((s) => {
         // orbit progression
         s.rotator.rotation.z += s.speed * dt; // around plane normal
         // spin/pulse of the symbol
@@ -386,6 +421,26 @@ export default function ThreeScene() {
         const tailMat = s.tail.material as THREE.SpriteMaterial;
         tailMat.opacity = 0.35;
         tailMat.rotation = s.prevAngle + Math.PI * 0.5; // orient slightly along tangent
+
+        // Project to screen and handle header overlap
+        const world = new THREE.Vector3();
+        s.node.getWorldPosition(world);
+        world.project(camera);
+        if (mountRef.current) {
+          const rect = mountRef.current.getBoundingClientRect();
+          const sx = rect.left + ((world.x + 1) / 2) * rect.width;
+          const sy = rect.top + ((1 - world.y) / 2) * rect.height;
+          const isOverHeader = sy <= headerBottom && sx >= rect.left && sx <= rect.right;
+          if (isOverHeader) {
+            // show DOM glyph above header; hide 3D text to avoid double
+            s.dom.style.transform = `translate(${Math.round(sx)}px, ${Math.round(sy)}px)`;
+            s.dom.style.display = 'block';
+            s.textSprite.visible = false;
+          } else {
+            s.dom.style.display = 'none';
+            s.textSprite.visible = true;
+          }
+        }
       });
 
       renderer.render(scene, camera);
@@ -405,11 +460,13 @@ export default function ThreeScene() {
     // Cleanup
     return () => {
       cancelAnimationFrame(raf);
-      window.removeEventListener("resize", onResize);
+  window.removeEventListener("resize", onResize);
   // dispose helper resources
       disposables.forEach((d) => {
         if (d.dispose) d.dispose();
       });
+  // remove DOM overlay
+  if (domOverlay.parentElement) domOverlay.parentElement.removeChild(domOverlay);
       if (renderer.domElement.parentElement === container) container.removeChild(renderer.domElement);
       renderer.dispose();
       earthGeom.dispose();
