@@ -52,6 +52,16 @@ main.page {
   padding: 2rem;
 }
 
+/* Hero typewriter styles */
+.hero-type {
+  margin-top: 12px;
+  font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  opacity: 0.95;
+}
+.hero-type-line + .hero-type-line { margin-top: 4px; }
+
 /* Portrait phones */
 @media (max-width: 820px) {
   .hero {
@@ -98,4 +108,11 @@ main.page {
 .sat--back {
   opacity: 0.35;
   filter: brightness(0.9) saturate(0.9);
+}
+
+.tw-end {
+  margin-top: 8px;
+  opacity: 0.7;
+  text-align: right;
+  font-size: 12px;
 }

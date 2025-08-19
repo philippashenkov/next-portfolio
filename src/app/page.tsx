@@ -1,4 +1,5 @@
 import ThreeScene from "./components/ThreeScene";
+import Typewriter from "./components/Typewriter";
 
 export default function Home() {
   return (
@@ -10,14 +11,39 @@ export default function Home() {
       <section className="hero__content">
         <div className="retro-card hero__card" style={{ padding: "1.75rem 2rem", width: "100%" }}>
           <h1 style={{ fontFamily: "var(--font-orbitron)", fontSize: 36, lineHeight: 1.2 }}>Hi, I’m Philipp</h1>
-          <p style={{ marginTop: 12, opacity: 0.9 }}>
-            Frontend & Creative Developer. I design and build fast, clean interfaces and rich web graphics with Three.js.
-            This website is my living playground and portfolio.
-          </p>
-          <div style={{ marginTop: 18, fontFamily: "var(--font-orbitron)", fontSize: 12, letterSpacing: 1, opacity: 0.9 }}>🧠 Interesting facts from Network Archive [2025.α]</div>
-          <p style={{ marginTop: 8, opacity: 0.9, lineHeight: 1.5 }}>
-            Over the next 15 years, the global web will spawn more than 700 million new nodes — sites, interfaces, digital realms. Simultaneously, hundreds of millions of existing structures will begin to decay, demanding refactoring, redesign, and reinvention. This isn’t just growth. It’s a tectonic shift in the visual culture of the internet. An era where interfaces become emotional, interactive, and alive. This project is not just a website. It’s an artifact of a new epoch — a fusion of code, aesthetics, and meaning, flowing through one interface. Welcome to the zone where pixels tell stories.
-          </p>
+          <div style={{ marginTop: 8, opacity: 0.95 }}>Frontend & Creative Developer</div>
+
+          <Typewriter
+            className="hero-type"
+            lineClassName="hero-type-line"
+            speedMsPerChar={8}
+            lineDelayMs={120}
+            startDelayMs={200}
+            cursorStyle="block"
+            lines={[
+              "> booting interface...",
+              "> loading modules: [three.js] [next.js] [signals] [visual-core]",
+              "> status: STABLE | latency: LOW | aesthetics: HIGH",
+              "",
+              "This site is not static.",
+              "It’s a living node in the evolving web.",
+              "A sandbox. A signal. A zone.",
+              "",
+              "> Interesting facts from Network Archive [2025.α]",
+              "$ echo \"Over the next 15 years, the web will mutate...\"",
+              "> +700M new nodes will spawn",
+              "> ~400M legacy systems will decay",
+              "> :: refactor | redesign | reimagine",
+              "",
+              "This isn’t just growth.",
+              "It’s a tectonic shift in digital culture.",
+              "Interfaces will become emotional, interactive, alive.",
+              "",
+              "[$] This project is not a portfolio.",
+              "It’s a transmission.",
+              "A fusion of code, aesthetics, and meaning.",
+            ]}
+          />
         </div>
       </section>
     </main>

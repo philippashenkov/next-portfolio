@@ -15,6 +15,20 @@ export default function ThreeScene() {
   Array.from(container.querySelectorAll('canvas')).forEach((c) => c.parentElement?.removeChild(c));
   overlay.innerHTML = ""; // no longer used for satellites, but safe to clear
 
+    // Settings (reduced-motion aware)
+    const prefersReduced = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const CFG = {
+      MAX_DPR: 1.5,
+      STARS: prefersReduced ? 900 : 1200,
+      SPHERE_SEG: 48,
+      RING_SEG: 64,
+      SAT_COUNT: prefersReduced ? 5 : 7,
+      EARTH_SPIN: prefersReduced ? 0.18 : 0.24,
+      STARS_SPIN: prefersReduced ? 0.07 : 0.1,
+      PING_OPACITY: prefersReduced ? 0.4 : 0.6,
+      TAIL_OPACITY: prefersReduced ? 0.25 : 0.35,
+    } as const;
+
     const scene = new THREE.Scene();
     scene.fog = new THREE.FogExp2(0x000010, 0.002);
 
@@ -26,8 +40,8 @@ export default function ThreeScene() {
     );
     camera.position.set(0, 0, 6);
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, CFG.MAX_DPR));
     renderer.setSize(container.clientWidth, container.clientHeight);
   renderer.shadowMap.enabled = false;
   renderer.domElement.style.position = "absolute";
@@ -44,10 +58,10 @@ export default function ThreeScene() {
     scene.add(keyLight, rimLight, ambient);
 
     // Starfield background
-    const starsGeom = new THREE.BufferGeometry();
-    const starCount = 1500;
-    const positions = new Float32Array(starCount * 3);
-    for (let i = 0; i < starCount; i++) {
+  const starsGeom = new THREE.BufferGeometry();
+  const starCount = CFG.STARS;
+  const positions = new Float32Array(starCount * 3);
+  for (let i = 0; i < starCount; i++) {
       const r = 60 * (0.5 + Math.random());
       const t = Math.random() * Math.PI * 2;
       const p = Math.acos(2 * Math.random() - 1);
@@ -72,7 +86,7 @@ export default function ThreeScene() {
   const CENTER_LONGITUDE_DEG = 20;
   const yawDeltaDeg = CENTER_LONGITUDE_DEG - 90;
   earthGroup.rotation.y = THREE.MathUtils.degToRad(yawDeltaDeg);
-    const earthGeom = new THREE.SphereGeometry(1.4, 64, 64);
+  const earthGeom = new THREE.SphereGeometry(1.4, CFG.SPHERE_SEG, CFG.SPHERE_SEG);
     const earthMat = new THREE.MeshStandardMaterial({
       color: 0x89b4ff,
       roughness: 0.8,
@@ -84,7 +98,7 @@ export default function ThreeScene() {
     earthGroup.add(earth);
 
     // Atmosphere glow (faked with additive transparent sphere)
-    const atmoGeom = new THREE.SphereGeometry(1.48, 64, 64);
+  const atmoGeom = new THREE.SphereGeometry(1.48, CFG.SPHERE_SEG, CFG.SPHERE_SEG);
     const atmoMat = new THREE.MeshBasicMaterial({
       color: 0x66ccff,
       transparent: true,
@@ -216,7 +230,10 @@ export default function ThreeScene() {
       let data: GeoJSONFeatureCollection | null = null;
       for (const url of urls) {
         try {
-          const res = await fetch(url, { cache: "force-cache" });
+          const controller = new AbortController();
+          const to = url.startsWith('http') ? setTimeout(() => controller.abort(), 1500) : null;
+          const res = await fetch(url, { cache: "force-cache", signal: controller.signal });
+          if (to) clearTimeout(to);
           if (!res.ok) continue;
           data = (await res.json()) as GeoJSONFeatureCollection;
           break;
@@ -241,16 +258,23 @@ export default function ThreeScene() {
         }
       };
 
-      for (const f of data.features) {
-        const geom = f.geometry;
-        if (!geom) continue;
-        if (geom.type === "Polygon") {
-          const coords = geom.coordinates; // [rings][points][lon,lat]
-          if (coords[0]) pushRing(coords[0]); // outer ring only for minimal look
-        } else if (geom.type === "MultiPolygon") {
-          const polys = geom.coordinates;
-          for (const poly of polys) if (poly[0]) pushRing(poly[0]);
+      const features = data.features;
+      // Chunk processing to avoid long main-thread stalls
+      const CHUNK = 40;
+      for (let i = 0; i < features.length; i += CHUNK) {
+        const slice = features.slice(i, i + CHUNK);
+        for (const f of slice) {
+          const geom = f.geometry;
+          if (!geom) continue;
+          if (geom.type === "Polygon") {
+            const coords = geom.coordinates; // [rings][points][lon,lat]
+            if (coords[0]) pushRing(coords[0]);
+          } else if (geom.type === "MultiPolygon") {
+            const polys = geom.coordinates;
+            for (const poly of polys) if (poly[0]) pushRing(poly[0]);
+          }
         }
+        await new Promise(requestAnimationFrame);
       }
 
       if (positions.length > 0) {
@@ -267,7 +291,7 @@ export default function ThreeScene() {
     loadGeoJSONCountries();
 
     // Orbits + symbol satellites with evenly distributed orbit planes (Fibonacci sphere normals)
-    const satCount = 7;
+  const satCount = CFG.SAT_COUNT;
     const golden = Math.PI * (3 - Math.sqrt(5));
     type SatState = {
       plane: THREE.Object3D;
@@ -298,85 +322,95 @@ export default function ThreeScene() {
   domOverlay.style.pointerEvents = 'none';
   domOverlay.style.zIndex = '999999999';
   document.body.appendChild(domOverlay);
-    for (let i = 0; i < satCount; i++) {
-      // Plane normal via Fibonacci sphere
-      const t = (i + 0.5) / satCount;
-      const y = 1 - 2 * t; // [-1,1]
-      const r = Math.sqrt(Math.max(0, 1 - y * y));
-      const phi = i * golden;
-      const nx = Math.cos(phi) * r;
-      const nz = Math.sin(phi) * r;
-      const normal = new THREE.Vector3(nx, y, nz).normalize();
+  // Build satellites over multiple frames
+      const buildSats = (startIndex = 0, perFrame = 3) => {
+        let i = startIndex;
+        const step = () => {
+          const end = Math.min(satCount, i + perFrame);
+          for (; i < end; i++) {
+            // Plane normal via Fibonacci sphere
+            const t = (i + 0.5) / satCount;
+            const y = 1 - 2 * t; // [-1,1]
+            const r = Math.sqrt(Math.max(0, 1 - y * y));
+            const phi = i * golden;
+            const nx = Math.cos(phi) * r;
+            const nz = Math.sin(phi) * r;
+            const normal = new THREE.Vector3(nx, y, nz).normalize();
 
-      const radius = 2.15 + (i % 5) * 0.28;
+            const radius = 2.15 + (i % 5) * 0.28;
 
-      // Plane group oriented so its local +Z matches the plane normal
-      const plane = new THREE.Object3D();
-      const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
-      plane.quaternion.copy(q);
-      earthGroup.add(plane);
+            // Plane group oriented so its local +Z matches the plane normal
+            const plane = new THREE.Object3D();
+            const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
+            plane.quaternion.copy(q);
+            earthGroup.add(plane);
 
-      // Orbit ring in the plane (ring lies in XY by default; rotate by same q)
-      const orbit = new THREE.RingGeometry(radius - 0.001, radius + 0.001, 128);
-      const orbitMat = new THREE.MeshBasicMaterial({ color: 0xffffff, opacity: 0.2, transparent: true, side: THREE.DoubleSide });
-      const orbitMesh = new THREE.Mesh(orbit, orbitMat);
-      orbitMesh.rotation.x = 0; // stays in XY for plane local space
-      orbitMesh.quaternion.copy(new THREE.Quaternion()); // identity in plane space
-      plane.add(orbitMesh);
-      disposables.push(orbit, orbitMat);
+            // Orbit ring in the plane (ring lies in XY by default; rotate by same q)
+            const orbit = new THREE.RingGeometry(radius - 0.001, radius + 0.001, CFG.RING_SEG);
+            const orbitMat = new THREE.MeshBasicMaterial({ color: 0xffffff, opacity: 0.2, transparent: true, side: THREE.DoubleSide });
+            const orbitMesh = new THREE.Mesh(orbit, orbitMat);
+            orbitMesh.rotation.x = 0; // stays in XY for plane local space
+            orbitMesh.quaternion.copy(new THREE.Quaternion()); // identity in plane space
+            plane.add(orbitMesh);
+            disposables.push(orbit, orbitMat);
 
-      // Rotator spins around plane's local Z (which equals world 'normal')
-      const rotator = new THREE.Object3D();
-      plane.add(rotator);
+            // Rotator spins around plane's local Z (which equals world 'normal')
+            const rotator = new THREE.Object3D();
+            plane.add(rotator);
 
-      // Create symbol node
-      const color = colors[i % colors.length];
-  const symbol = symbols[i % symbols.length];
-  const { group: symGroup, ping, text } = makeSymbolNode(symbol, color);
-      const node = new THREE.Group();
-      node.add(symGroup);
-      node.position.set(radius, 0, 0); // on X axis of the plane's XY ring
-      rotator.add(node);
+            // Create symbol node
+            const color = colors[i % colors.length];
+            const symbol = symbols[i % symbols.length];
+            const { group: symGroup, ping, text } = makeSymbolNode(symbol, color);
+            const node = new THREE.Group();
+            node.add(symGroup);
+            node.position.set(radius, 0, 0); // on X axis of the plane's XY ring
+            rotator.add(node);
 
-  // DOM element for overlay rendering above header when overlapping
-  const span = document.createElement('span');
-  span.textContent = symbol;
-  span.style.position = 'fixed';
-  span.style.left = '0';
-  span.style.top = '0';
-  span.style.transform = 'translate(-9999px,-9999px)';
-  span.style.font = 'bold 14px Orbitron, Arial, Helvetica, sans-serif';
-  span.style.color = `#${color.toString(16).padStart(6,'0')}`;
-  span.style.textShadow = `0 0 6px rgba(51,224,255,0.9), 0 0 12px rgba(51,224,255,0.6)`;
-  span.style.userSelect = 'none';
-  domOverlay.appendChild(span);
+            // DOM element overlay (above header when overlapping)
+            const span = document.createElement('span');
+            span.textContent = symbol;
+            span.style.position = 'fixed';
+            span.style.left = '0';
+            span.style.top = '0';
+            span.style.transform = 'translate(-9999px,-9999px)';
+            span.style.font = 'bold 14px Orbitron, Arial, Helvetica, sans-serif';
+            span.style.color = `#${color.toString(16).padStart(6,'0')}`;
+            span.style.textShadow = '0 0 6px rgba(51,224,255,0.9), 0 0 12px rgba(51,224,255,0.6)';
+            span.style.userSelect = 'none';
+            domOverlay.appendChild(span);
 
-      // Tail sprite lives in plane space so it lags behind orbit
-      const tail = glowSprite(color, 0.16);
-      (tail.material as THREE.SpriteMaterial).opacity = 0.0;
-      plane.add(tail);
+            // Tail sprite lives in plane space so it lags behind orbit
+            const tail = glowSprite(color, 0.16);
+            (tail.material as THREE.SpriteMaterial).opacity = 0.0;
+            plane.add(tail);
 
-      // randomize start phase
-      rotator.rotation.z = Math.random() * Math.PI * 2;
+            // randomize start phase
+            rotator.rotation.z = Math.random() * Math.PI * 2;
 
-      sats.push({
-        plane,
-        rotator,
-        node,
-        sym: symGroup,
-  ping,
-  textSprite: text,
-        tail,
-        prevAngle: rotator.rotation.z,
-        speed: 0.35 + (i % 6) * 0.08,
-        spin: 0.8 + (i % 5) * 0.25,
-        time: Math.random() * 10,
-        color,
-  radius,
-  dom: span,
-  symbol,
-      });
-    }
+            sats.push({
+              plane,
+              rotator,
+              node,
+              sym: symGroup,
+              ping,
+              textSprite: text,
+              tail,
+              prevAngle: rotator.rotation.z,
+              speed: 0.35 + (i % 6) * 0.08,
+              spin: 0.8 + (i % 5) * 0.25,
+              time: Math.random() * 10,
+              color,
+              radius,
+              dom: span,
+              symbol,
+            });
+          }
+          if (i < satCount) requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
+      };
+  buildSats(0, 3);
 
     // Animation loop
     let raf = 0;
@@ -387,8 +421,8 @@ export default function ThreeScene() {
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
       // Spin the whole Earth system (surface, atmosphere, borders)
-      earthGroup.rotation.y += 0.24 * dt;
-      stars.rotation.y += 0.1 * dt;
+  earthGroup.rotation.y += CFG.EARTH_SPIN * dt;
+  stars.rotation.y += CFG.STARS_SPIN * dt;
 
   // locate header (cache per frame, cheap)
   const headerEl = document.querySelector('header, nav, [role="banner"]') as HTMLElement | null;
@@ -404,11 +438,11 @@ export default function ThreeScene() {
         s.sym.scale.setScalar(pulse);
 
         // ping ring: expand and fade on a loop
-        const period = 2.6 + (s.radius * 0.05);
-        const t = (s.time % period) / period;
-        const pingMat = s.ping.material as THREE.SpriteMaterial;
-        s.ping.scale.setScalar(0.18 + t * 0.5);
-        pingMat.opacity = 0.6 * (1 - t);
+  const period = 2.6 + (s.radius * 0.05);
+  const t = (s.time % period) / period;
+  const pingMat = s.ping.material as THREE.SpriteMaterial;
+  s.ping.scale.setScalar(0.18 + t * 0.5);
+  pingMat.opacity = CFG.PING_OPACITY * (1 - t);
 
         // trailing ghost in plane space
         const curr = s.rotator.rotation.z;
@@ -419,7 +453,7 @@ export default function ThreeScene() {
         const ty = Math.sin(s.prevAngle) * s.radius;
         s.tail.position.set(tx, ty, 0);
         const tailMat = s.tail.material as THREE.SpriteMaterial;
-        tailMat.opacity = 0.35;
+  tailMat.opacity = CFG.TAIL_OPACITY;
         tailMat.rotation = s.prevAngle + Math.PI * 0.5; // orient slightly along tangent
 
         // Project to screen and handle header overlap
