@@ -373,7 +373,7 @@ export default function ThreeScene() {
   }, []);
 
   return (
-    <div ref={mountRef} style={{ position: "relative", width: "100%", height: "calc(100vh - 64px)" }}>
+  <div ref={mountRef} style={{ position: "relative", width: "100%", height: "100%" }}>
       <div ref={overlayRef} style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 2 }} />
     </div>
   );

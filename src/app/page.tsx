@@ -2,13 +2,13 @@ import ThreeScene from "./components/ThreeScene";
 
 export default function Home() {
   return (
-    <main className="page" style={{ minHeight: "100vh", display: "grid", gridTemplateColumns: "1.2fr 1fr" }}>
-      <div style={{ position: "relative" }}>
+    <main className="page hero">
+      <div className="hero__scene">
         <ThreeScene />
       </div>
 
-      <section style={{ display: "flex", alignItems: "center", padding: "2rem" }}>
-        <div className="retro-card" style={{ padding: "1.75rem 2rem", width: "100%" }}>
+      <section className="hero__content">
+        <div className="retro-card hero__card" style={{ padding: "1.75rem 2rem", width: "100%" }}>
           <h1 style={{ fontFamily: "var(--font-orbitron)", fontSize: 36, lineHeight: 1.2 }}>Hi, I’m Philipp</h1>
           <p style={{ marginTop: 12, opacity: 0.9 }}>
             Frontend & Creative Developer. I design and build fast, clean interfaces and rich web graphics with Three.js.
