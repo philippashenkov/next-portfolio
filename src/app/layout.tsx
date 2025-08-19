@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono, Orbitron } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/app/components/Navbar";
+import SkyStreaks from "@/app/components/SkyStreaks";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -36,6 +37,7 @@ export default function RootLayout({
       <body className={`${geistSans.variable} ${geistMono.variable} ${orbitron.variable}`}>
         <Navbar />
         {children}
+        <SkyStreaks />
       </body>
     </html>
   );

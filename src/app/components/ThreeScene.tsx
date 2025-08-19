@@ -65,8 +65,13 @@ export default function ThreeScene() {
     // Earth sphere
   const earthGroup = new THREE.Group();
   scene.add(earthGroup);
-  // Axial tilt ~23.5° for a nicer, realistic rotation
-  earthGroup.rotation.z = THREE.MathUtils.degToRad(23.5);
+  // Axial tilt (deg) around X. Set to 0 so the equator sits level and centered.
+  const TILT_DEG = 0;
+  earthGroup.rotation.x = THREE.MathUtils.degToRad(TILT_DEG);
+  // Face Africa roughly to the camera: Africa ≈ 20°E; default front is 90°E → yaw delta = 20 - 90 = -70°
+  const CENTER_LONGITUDE_DEG = 20;
+  const yawDeltaDeg = CENTER_LONGITUDE_DEG - 90;
+  earthGroup.rotation.y = THREE.MathUtils.degToRad(yawDeltaDeg);
     const earthGeom = new THREE.SphereGeometry(1.4, 64, 64);
     const earthMat = new THREE.MeshStandardMaterial({
       color: 0x89b4ff,
@@ -113,98 +118,74 @@ export default function ThreeScene() {
     disposables.push(glowTex);
 
     function glowSprite(color: number, scale = 0.18) {
-      const mat = new THREE.SpriteMaterial({ map: glowTex, color, transparent: true, depthWrite: false });
+      const mat = new THREE.SpriteMaterial({ map: glowTex, color, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
       const sprite = new THREE.Sprite(mat);
       sprite.scale.setScalar(scale);
       disposables.push(mat);
       return sprite;
     }
 
-  function material(color: number) {
-      const m = new THREE.MeshStandardMaterial({ color, roughness: 0.5, metalness: 0.2, emissive: color, emissiveIntensity: 0.35 });
-      disposables.push(m);
-      return m;
+  // no mesh materials needed for symbol sprites
+
+  // Minimal neon text sprites as satellites
+
+    function makeTextTexture(text: string, color: string) {
+      const size = 256;
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = size;
+      const ctx = canvas.getContext('2d')!;
+      ctx.clearRect(0,0,size,size);
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = 'bold 140px Orbitron, Arial, Helvetica, sans-serif';
+      // soft outer glow
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 24;
+      ctx.fillStyle = color;
+      ctx.fillText(text, size/2, size/2);
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.anisotropy = 4;
+      return tex;
     }
 
-    const geoms: Record<string, THREE.BufferGeometry> = {};
-    const getGeom = (key: string, factory: () => THREE.BufferGeometry) => {
-      if (!geoms[key]) { geoms[key] = factory(); disposables.push(geoms[key]); }
-      return geoms[key];
-    };
+    function makeRingTexture(color: string) {
+      const s = 256; const rOut = 120; const rIn = 84;
+      const c = document.createElement('canvas'); c.width = c.height = s;
+      const x = s/2, y = s/2; const ctx = c.getContext('2d')!;
+      ctx.clearRect(0,0,s,s);
+      ctx.beginPath(); ctx.arc(x,y,rOut,0,Math.PI*2);
+      ctx.lineWidth = rOut - rIn;
+      ctx.strokeStyle = color;
+      ctx.globalAlpha = 0.9;
+      ctx.stroke();
+      const tex = new THREE.CanvasTexture(c); tex.anisotropy = 2; return tex;
+    }
 
-    function makeRocket(color = 0xffe08a) {
+    function makeSymbolNode(symbol: string, colorHex: number) {
+      const colorCss = `#${colorHex.toString(16).padStart(6,'0')}`;
       const g = new THREE.Group();
-      const body = new THREE.Mesh(getGeom('rocketBody', () => new THREE.CylinderGeometry(0.04, 0.04, 0.22, 12)), material(color));
-      const nose = new THREE.Mesh(getGeom('rocketNose', () => new THREE.ConeGeometry(0.05, 0.08, 12)), material(color));
-      nose.position.y = 0.15;
-      const tail = new THREE.Mesh(getGeom('rocketTail', () => new THREE.ConeGeometry(0.035, 0.06, 10)), material(0x8ec5ff));
-      tail.position.y = -0.14; tail.rotation.x = Math.PI;
-      // fins
-      const finGeom = getGeom('rocketFin', () => new THREE.BoxGeometry(0.02, 0.06, 0.004));
-      const fin1 = new THREE.Mesh(finGeom, material(0x9ad6ff)); fin1.position.set(0.03, -0.11, 0);
-      const fin2 = fin1.clone(); fin2.position.x = -0.03;
-      g.add(body, nose, tail, fin1, fin2, glowSprite(0xffffff, 0.22));
-      g.rotation.z = Math.PI / 2; // point along +X
-      const light = new THREE.PointLight(0xffc070, 0.5, 1.2);
-      light.position.set(-0.08, 0, 0);
-      g.add(light); disposables.push(light);
-      return g;
+      const textTex = makeTextTexture(symbol, colorCss);
+  const textMat = new THREE.SpriteMaterial({ map: textTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+      const text = new THREE.Sprite(textMat);
+      text.scale.setScalar(0.22);
+      const halo = glowSprite(colorHex, 0.28);
+      halo.position.z = -0.001;
+      g.add(halo, text);
+      disposables.push(textTex, textMat);
+
+      // ping ring
+      const ringTex = makeRingTexture(colorCss);
+  const ringMat = new THREE.SpriteMaterial({ map: ringTex, transparent: true, depthWrite: false, opacity: 0.0, blending: THREE.AdditiveBlending });
+      const ring = new THREE.Sprite(ringMat);
+      ring.scale.setScalar(0.18);
+      g.add(ring);
+      disposables.push(ringTex, ringMat);
+      return { group: g, ping: ring };
     }
 
-    function makeSatellite(color = 0x9ad6ff) {
-      const g = new THREE.Group();
-      const core = new THREE.Mesh(getGeom('satCore', () => new THREE.BoxGeometry(0.06, 0.06, 0.06)), material(color));
-      const panelGeom = getGeom('satPanel', () => new THREE.PlaneGeometry(0.18, 0.06));
-      const panelL = new THREE.Mesh(panelGeom, material(0x66ccff)); panelL.position.x = -0.12; panelL.rotation.y = Math.PI;
-      const panelR = new THREE.Mesh(panelGeom, material(0x66ccff)); panelR.position.x = 0.12;
-      g.add(core, panelL, panelR, glowSprite(0xbbe9ff, 0.18));
-      const light = new THREE.PointLight(0x9ad6ff, 0.4, 0.9); g.add(light); disposables.push(light);
-      return g;
-    }
-
-    function makePlane(color = 0xffffff) {
-      const g = new THREE.Group();
-      const fuselage = new THREE.Mesh(getGeom('planeBody', () => new THREE.CapsuleGeometry(0.035, 0.18, 6, 12)), material(color));
-      const wing = new THREE.Mesh(getGeom('planeWing', () => new THREE.BoxGeometry(0.14, 0.01, 0.06)), material(0xbedbff)); wing.position.y = 0;
-      const tail = new THREE.Mesh(getGeom('planeTail', () => new THREE.BoxGeometry(0.04, 0.04, 0.01)), material(0xbedbff)); tail.position.set(-0.08, 0.03, 0);
-      g.add(fuselage, wing, tail, glowSprite(0xffffff, 0.16));
-      g.rotation.z = Math.PI / 2;
-      const light = new THREE.PointLight(0xffffff, 0.4, 1.0); g.add(light); disposables.push(light);
-      return g;
-    }
-
-    function makeProbe(color = 0xfff6c2) {
-      const mesh = new THREE.Mesh(getGeom('probe', () => new THREE.OctahedronGeometry(0.06)), material(color));
-      const g = new THREE.Group(); g.add(mesh, glowSprite(0xfff6c2, 0.18)); return g;
-    }
-
-    function makeUFO(color = 0xc0f2ff) {
-      const g = new THREE.Group();
-      const ring = new THREE.Mesh(getGeom('ufoRing', () => new THREE.TorusGeometry(0.08, 0.025, 12, 24)), material(color));
-      const dome = new THREE.Mesh(getGeom('ufoDome', () => new THREE.SphereGeometry(0.045, 16, 12)), material(0xffffff)); dome.position.y = 0.03;
-      g.add(ring, dome, glowSprite(0xcaf7ff, 0.22));
-      const light = new THREE.PointLight(0xcaf7ff, 0.5, 1.2); g.add(light); disposables.push(light);
-      return g;
-    }
-
-    function makeDish(color = 0xa8d8ff) {
-      const g = new THREE.Group();
-      const dish = new THREE.Mesh(getGeom('dish', () => new THREE.ConeGeometry(0.08, 0.06, 16, 1, true)), material(color));
-      dish.rotation.z = Math.PI; dish.rotation.x = -Math.PI / 4; dish.position.y = 0.02;
-      const stem = new THREE.Mesh(getGeom('dishStem', () => new THREE.CylinderGeometry(0.008, 0.008, 0.08, 8)), material(0x8fbfff)); stem.position.y = -0.04;
-      g.add(dish, stem, glowSprite(0xa8d8ff, 0.16));
-      return g;
-    }
-
-    function makeDrone(color = 0xffd7a8) {
-      const g = new THREE.Group();
-      const body = new THREE.Mesh(getGeom('droneBody', () => new THREE.TetrahedronGeometry(0.06)), material(color));
-      const bar = new THREE.Mesh(getGeom('droneBar', () => new THREE.CylinderGeometry(0.006, 0.006, 0.18, 8)), material(0xffe3bf));
-      g.add(body, bar, glowSprite(0xffe3bf, 0.16));
-      return g;
-    }
-
-    const makers = [makeRocket, makeSatellite, makePlane, makeProbe, makeUFO, makeDish, makeDrone];
+    // symbols and colors
+  const symbols = ['*', '#', '</>', '`O.', '[$]', '=>', '`•'];
+    const colors = [0x9ad6ff, 0x66ccff, 0xbbe9ff, 0xcaf7ff, 0x8fdcff, 0xa8e0ff, 0x7fd1ff];
 
     // ---- GeoJSON country boundaries (neon minimal lines) ----
     // Convert lon/lat to a 3D point on the sphere surface
@@ -285,10 +266,24 @@ export default function ThreeScene() {
     // Fire and forget; no need to await render start
     loadGeoJSONCountries();
 
-    // Orbits + 3D satellites with evenly distributed orbit planes (Fibonacci sphere normals)
+    // Orbits + symbol satellites with evenly distributed orbit planes (Fibonacci sphere normals)
     const satCount = 7;
     const golden = Math.PI * (3 - Math.sqrt(5));
-    const sats: { plane: THREE.Object3D; rotator: THREE.Object3D; node: THREE.Object3D; speed: number; spin: number }[] = [];
+    type SatState = {
+      plane: THREE.Object3D;
+      rotator: THREE.Object3D;
+      node: THREE.Group; // contains symbol + halo
+      sym: THREE.Group; // the symbol group returned by makeSymbolNode().group
+      ping: THREE.Sprite;
+      tail: THREE.Sprite;
+      prevAngle: number;
+      speed: number;
+      spin: number;
+      time: number;
+      color: number;
+      radius: number;
+    };
+    const sats: SatState[] = [];
     for (let i = 0; i < satCount; i++) {
       // Plane normal via Fibonacci sphere
       const t = (i + 0.5) / satCount;
@@ -320,25 +315,77 @@ export default function ThreeScene() {
       const rotator = new THREE.Object3D();
       plane.add(rotator);
 
-      const maker = makers[i % makers.length];
-      const node = maker();
+      // Create symbol node
+      const color = colors[i % colors.length];
+      const { group: symGroup, ping } = makeSymbolNode(symbols[i % symbols.length], color);
+      const node = new THREE.Group();
+      node.add(symGroup);
       node.position.set(radius, 0, 0); // on X axis of the plane's XY ring
       rotator.add(node);
 
-      sats.push({ plane, rotator, node, speed: 0.35 + (i % 6) * 0.08, spin: 0.01 + (i % 5) * 0.004 });
+      // Tail sprite lives in plane space so it lags behind orbit
+      const tail = glowSprite(color, 0.16);
+      (tail.material as THREE.SpriteMaterial).opacity = 0.0;
+      plane.add(tail);
+
+      // randomize start phase
+      rotator.rotation.z = Math.random() * Math.PI * 2;
+
+      sats.push({
+        plane,
+        rotator,
+        node,
+        sym: symGroup,
+        ping,
+        tail,
+        prevAngle: rotator.rotation.z,
+        speed: 0.35 + (i % 6) * 0.08,
+        spin: 0.8 + (i % 5) * 0.25,
+        time: Math.random() * 10,
+        color,
+        radius,
+      });
     }
 
     // Animation loop
     let raf = 0;
+    let last = performance.now();
     const animate = () => {
       raf = requestAnimationFrame(animate);
+      const now = performance.now();
+      const dt = Math.min(0.05, (now - last) / 1000);
+      last = now;
       // Spin the whole Earth system (surface, atmosphere, borders)
-      earthGroup.rotation.y += 0.0012;
-      stars.rotation.y += 0.0005;
+      earthGroup.rotation.y += 0.24 * dt;
+      stars.rotation.y += 0.1 * dt;
 
       sats.forEach((s) => {
-        s.rotator.rotation.z += s.speed * 0.01; // rotate around plane normal
-        s.node.rotation.y += s.spin;
+        // orbit progression
+        s.rotator.rotation.z += s.speed * dt; // around plane normal
+        // spin/pulse of the symbol
+        s.node.rotation.z += s.spin * 0.1 * dt;
+        s.time += dt;
+        const pulse = 1 + 0.1 * Math.sin(s.time * (1.2 + (s.speed * 0.5)) + (s.radius * 0.3));
+        s.sym.scale.setScalar(pulse);
+
+        // ping ring: expand and fade on a loop
+        const period = 2.6 + (s.radius * 0.05);
+        const t = (s.time % period) / period;
+        const pingMat = s.ping.material as THREE.SpriteMaterial;
+        s.ping.scale.setScalar(0.18 + t * 0.5);
+        pingMat.opacity = 0.6 * (1 - t);
+
+        // trailing ghost in plane space
+        const curr = s.rotator.rotation.z;
+        // ease prev angle toward a bit behind current
+        const target = curr - 0.25;
+        s.prevAngle += (target - s.prevAngle) * Math.min(1, 6 * dt);
+        const tx = Math.cos(s.prevAngle) * s.radius;
+        const ty = Math.sin(s.prevAngle) * s.radius;
+        s.tail.position.set(tx, ty, 0);
+        const tailMat = s.tail.material as THREE.SpriteMaterial;
+        tailMat.opacity = 0.35;
+        tailMat.rotation = s.prevAngle + Math.PI * 0.5; // orient slightly along tangent
       });
 
       renderer.render(scene, camera);
@@ -359,8 +406,7 @@ export default function ThreeScene() {
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", onResize);
-      // dispose helper resources
-      Object.values(geoms).forEach(() => {});
+  // dispose helper resources
       disposables.forEach((d) => {
         if (d.dispose) d.dispose();
       });
