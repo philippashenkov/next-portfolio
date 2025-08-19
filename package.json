@@ -1,13 +1,14 @@
 {
-  "name": "threejs-playground",
+  "name": "portfolio-next",
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
   },
+  "description": "Personal portfolio built with Next.js, React, TypeScript, and Three.js",
   "dependencies": {
     "next": "15.4.6",
     "react": "19.1.0",
@@ -19,6 +20,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/three": "^0.179.0",
     "eslint": "^9",
     "eslint-config-next": "15.4.6",
     "typescript": "^5"

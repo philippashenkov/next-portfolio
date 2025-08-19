@@ -1,95 +1,26 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+import ThreeScene from "./components/ThreeScene";
+import Link from "next/link";
 
 export default function Home() {
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol>
-          <li>
-            Get started by editing <code>src/app/page.tsx</code>.
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+    <main className="page" style={{ minHeight: "100vh", display: "grid", gridTemplateColumns: "1.2fr 1fr" }}>
+      <div style={{ position: "relative" }}>
+        <ThreeScene />
+      </div>
 
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-            className={styles.secondary}
-          >
-            Read our docs
-          </a>
+      <section style={{ display: "flex", alignItems: "center", padding: "2rem" }}>
+        <div className="retro-card" style={{ padding: "1.5rem 1.75rem", width: "100%" }}>
+          <h1 style={{ fontFamily: "var(--font-orbitron)", fontSize: 36, lineHeight: 1.2 }}>Hi, I’m Philipp</h1>
+          <p style={{ marginTop: 12, opacity: 0.9 }}>
+            Frontend & Creative Developer. I design and build fast, clean interfaces and rich web graphics with Three.js.
+            This website is my living playground and portfolio.
+          </p>
+          <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+            <Link href="/about" className="retro-card" style={{ padding: "0.6rem 1rem" }}>About</Link>
+            <Link href="/contacts" className="retro-card" style={{ padding: "0.6rem 1rem" }}>Contacts</Link>
+          </div>
         </div>
-      </main>
-      <footer className={styles.footer}>
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+      </section>
+    </main>
   );
 }

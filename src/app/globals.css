@@ -1,13 +1,9 @@
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --foreground: #0a0a0a;
+  --bg-start: #ffea00; /* yellow */
+  --bg-mid: #ffd07a;   /* warm */
+  --bg-end: #00a3ff;   /* blue */
+  --glass: rgba(255, 255, 255, 0.08);
 }
 
 html,
@@ -17,9 +13,10 @@ body {
 }
 
 body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  color: #fff;
+  background: linear-gradient(135deg, var(--bg-start), var(--bg-mid) 40%, var(--bg-end));
+  min-height: 100vh;
+  font-family: var(--font-geist-sans, Arial, Helvetica, sans-serif);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -35,8 +32,15 @@ a {
   text-decoration: none;
 }
 
-@media (prefers-color-scheme: dark) {
-  html {
-    color-scheme: dark;
-  }
+/* Page padding to account for fixed navbar */
+main.page {
+  padding-top: 64px;
+}
+
+/* Subtle scanline + retro glow */
+.retro-card {
+  background: var(--glass);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.25);
+  border-radius: 16px;
 }
