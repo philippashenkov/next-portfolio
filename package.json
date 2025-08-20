@@ -8,7 +8,10 @@
     "build": "next build",
     "start": "next start",
   "lint": "next lint",
-  "clean": "node -e \"try{require('fs').rmSync('.next',{recursive:true,force:true})}catch(e){}\""
+  "clean": "node -e \"try{require('fs').rmSync('.next',{recursive:true,force:true})}catch(e){}\"",
+  "test": "vitest run --reporter=default",
+  "test:watch": "vitest",
+  "test:coverage": "vitest run --coverage"
   },
   "description": "Personal portfolio built with Next.js, React, TypeScript, and Three.js",
   "dependencies": {
@@ -25,6 +28,11 @@
     "@types/three": "^0.179.0",
     "eslint": "^9",
     "eslint-config-next": "15.4.6",
-    "typescript": "^5"
+  "typescript": "^5",
+  "@testing-library/jest-dom": "^6.4.0",
+  "@testing-library/react": "^16.0.0",
+  "@testing-library/user-event": "^14.5.2",
+  "jsdom": "^24.1.0",
+  "vitest": "^1.6.0"
   }
 }

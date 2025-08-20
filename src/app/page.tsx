@@ -1,3 +1,4 @@
+import React from "react";
 import ThreeScene from "./components/ThreeScene";
 import Typewriter from "./components/Typewriter";
 

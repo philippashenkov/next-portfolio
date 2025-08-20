@@ -1,5 +1,11 @@
 "use client";
 import { useEffect, useRef } from "react";
+
+declare global {
+  // Provided by Vitest test env; used to short-circuit WebGL init during tests
+  var __VITEST__: boolean | undefined;
+  var __IS_TEST__: boolean | undefined;
+}
 import * as THREE from "three";
 
 export default function ThreeScene() {
@@ -7,6 +13,12 @@ export default function ThreeScene() {
   const overlayRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    // Skip full WebGL initialization in unit tests (jsdom)
+    const isJsdom = typeof navigator !== 'undefined' && /jsdom/i.test(navigator.userAgent || '');
+    const isTestFlag = typeof globalThis !== 'undefined' && (globalThis.__VITEST__ || globalThis.__IS_TEST__);
+    if (isJsdom || isTestFlag) {
+      return;
+    }
     const container = mountRef.current;
     const overlay = overlayRef.current;
     if (!container || !overlay) return;
