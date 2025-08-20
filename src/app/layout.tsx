@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Orbitron } from "next/font/google";
 import "./globals.css";
-import Navbar from "@/app/components/Navbar";
+import Link from "next/link";
+import Topbar from "@/app/components/Topbar";
 import SkyStreaks from "@/app/components/SkyStreaks";
 
 const geistSans = Geist({
@@ -27,15 +28,13 @@ export const metadata: Metadata = {
   description: "Frontend & Creative Developer portfolio: React, Vue, Next.js, TypeScript, Three.js, Node.js • CI/CD and cloud infrastructure.",
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export const viewport = { width: 'device-width', initialScale: 1, viewportFit: 'cover' };
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className={`${geistSans.variable} ${geistMono.variable} ${orbitron.variable}`}>
-        {/* Set initial theme to avoid flash */}
+    <html lang="en">
+      <body>
+        {/* Инициализация темы без вспышки */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
@@ -49,7 +48,7 @@ export default function RootLayout({
             `,
           }}
         />
-        <Navbar />
+        <Topbar />
         {children}
         <SkyStreaks />
       </body>

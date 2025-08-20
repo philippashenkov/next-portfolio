@@ -251,3 +251,89 @@ main.page {
 
 /* Расстояние между нав-кнопками */
 .nav-btn + .nav-btn { margin-left: 8px; }
+
+/* --- Topbar responsive --- */
+header[data-topbar],
+header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: clamp(8px, 2vw, 16px);
+  padding-inline: clamp(10px, 2vw, 20px);
+  padding-block: calc(env(safe-area-inset-top, 0px) + clamp(6px, 1.2vw, 12px));
+  backdrop-filter: saturate(120%) blur(6px);
+}
+
+header[data-topbar] [data-brand],
+header .brand {
+  font-weight: 700;
+  font-size: clamp(14px, 3.6vw, 20px);
+  white-space: nowrap;
+}
+
+header[data-topbar] [data-nav],
+header nav {
+  display: flex;
+  flex-wrap: wrap;                /* переносятся на 2-ю строку */
+  justify-content: flex-end;
+  align-items: center;
+  gap: clamp(6px, 1.6vw, 12px);
+  min-width: 0;
+  max-width: 100%;
+}
+
+header[data-topbar] [data-btn],
+header .btn {
+  appearance: none;
+  border: 1px solid var(--btn-border, rgba(255,255,255,.25));
+  background: var(--btn-bg, rgba(255,255,255,.06));
+  color: var(--btn-fg, #e8f6ff);
+  border-radius: var(--btn-radius, 999px);
+  padding: clamp(6px, 1.6vw, 10px) clamp(10px, 3vw, 16px);
+  font-size: clamp(12px, 3.2vw, 14px);
+  line-height: 1;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+header[data-topbar] [data-btn]:hover,
+header .btn:hover {
+  background: var(--btn-bg-hover, rgba(255,255,255,.12));
+}
+
+/* На узких — бренд сверху, кнопки центрируем; текст темы скрываем */
+@media (max-width: 420px) {
+  header[data-topbar],
+  header {
+    grid-template-columns: 1fr;
+  }
+  header[data-topbar] [data-nav],
+  header nav {
+    justify-content: center;
+  }
+  [data-theme-btn] [data-label],
+  .btn--toggle .btn__label {
+    position: absolute;
+    width: 1px; height: 1px; overflow: hidden;
+    clip: rect(0 0 0 0); clip-path: inset(50%);
+  }
+  [data-theme-btn],
+  .btn--toggle {
+    width: 36px; padding: 8px; aspect-ratio: 1 / 1;
+    justify-content: center;
+  }
+}
+
+/* Совсем узко — ужимаем паддинги/шрифт */
+@media (max-width: 340px) {
+  header[data-topbar] [data-btn],
+  header .btn {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+}
