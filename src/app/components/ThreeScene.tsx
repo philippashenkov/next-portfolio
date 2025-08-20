@@ -54,11 +54,12 @@ export default function ThreeScene() {
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, CFG.MAX_DPR));
-    renderer.setSize(container.clientWidth, container.clientHeight);
+      // Settings (reduced-motion aware)
   renderer.shadowMap.enabled = false;
   renderer.domElement.style.position = "absolute";
   renderer.domElement.style.inset = "0";
   renderer.domElement.style.zIndex = "1";
+  renderer.setSize(container.clientWidth, container.clientHeight);
     container.appendChild(renderer.domElement);
 
     // Lighting with yellow-blue tint
@@ -81,11 +82,9 @@ export default function ThreeScene() {
       positions[i * 3 + 1] = r * Math.sin(p) * Math.sin(t);
       positions[i * 3 + 2] = r * Math.cos(p);
     }
-    starsGeom.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-    const stars = new THREE.Points(
-      starsGeom,
-      new THREE.PointsMaterial({ color: 0xffffff, size: 0.2, sizeAttenuation: true })
-    );
+  starsGeom.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  const starMat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.2, sizeAttenuation: true });
+  const stars = new THREE.Points(starsGeom, starMat);
     scene.add(stars);
 
     // Earth sphere
@@ -110,7 +109,7 @@ export default function ThreeScene() {
     earthGroup.add(earth);
 
     // Atmosphere glow (faked with additive transparent sphere)
-  const atmoGeom = new THREE.SphereGeometry(1.48, CFG.SPHERE_SEG, CFG.SPHERE_SEG);
+    const atmoGeom = new THREE.SphereGeometry(1.48, CFG.SPHERE_SEG, CFG.SPHERE_SEG);
     const atmoMat = new THREE.MeshBasicMaterial({
       color: 0x66ccff,
       transparent: true,
@@ -120,7 +119,7 @@ export default function ThreeScene() {
     });
     const atmosphere = new THREE.Mesh(atmoGeom, atmoMat);
     atmosphere.renderOrder = 0;
-    earthGroup.add(atmosphere);
+  earthGroup.add(atmosphere);
 
   // ---- Helpers ----
   const disposables: Array<THREE.BufferGeometry | THREE.Material | THREE.Texture | THREE.Light> = [];
@@ -493,7 +492,7 @@ export default function ThreeScene() {
     };
     animate();
 
-    // Handle resize
+  // Handle resize
     const onResize = () => {
       if (!mountRef.current) return;
       const { clientWidth, clientHeight } = mountRef.current;
@@ -503,10 +502,28 @@ export default function ThreeScene() {
     };
     window.addEventListener("resize", onResize);
 
+    // Adjust contrast per theme
+    const applyTheme = () => {
+      const theme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+      const light = theme === 'light';
+      // On light background, make stars cooler and slightly larger
+      starMat.color.set(light ? 0x66ccff : 0xffffff);
+      starMat.size = light ? 0.28 : 0.2;
+      starMat.needsUpdate = true;
+      // Slightly stronger emissive/atmo on light for contrast
+      (earth.material as THREE.MeshStandardMaterial).emissiveIntensity = light ? 0.3 : 0.2;
+      atmoMat.opacity = light ? 0.3 : 0.25;
+      atmoMat.needsUpdate = true;
+    };
+    applyTheme();
+    const mo = new MutationObserver(applyTheme);
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
     // Cleanup
     return () => {
       cancelAnimationFrame(raf);
   window.removeEventListener("resize", onResize);
+  mo.disconnect();
   // dispose helper resources
       disposables.forEach((d) => {
         if (d.dispose) d.dispose();

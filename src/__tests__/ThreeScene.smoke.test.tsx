@@ -7,18 +7,34 @@ import ThreeScene from "../app/components/ThreeScene";
 
 declare global {
   interface HTMLCanvasElement {
-    getContext(contextId: string, options?: any): any;
+    getContext(
+      contextId: string,
+      options?: WebGLContextAttributes
+    ): WebGLRenderingContext | WebGL2RenderingContext | null;
   }
 }
 
 beforeAll(() => {
   // Basic mock that returns an object for 'webgl'/'webgl2' and null otherwise
-  HTMLCanvasElement.prototype.getContext = function (id: string) {
-    if (id === "webgl" || id === "webgl2") {
-      return {} as any;
-    }
-    return null;
-  };
+  type AnyCtx =
+    | CanvasRenderingContext2D
+    | ImageBitmapRenderingContext
+    | WebGLRenderingContext
+    | WebGL2RenderingContext
+    | null;
+  const orig = HTMLCanvasElement.prototype.getContext?.bind(
+    HTMLCanvasElement.prototype
+  ) as ((id: string, options?: unknown) => AnyCtx) | undefined;
+
+  Object.defineProperty(HTMLCanvasElement.prototype, "getContext", {
+    configurable: true,
+    value: function (id: string, options?: unknown): AnyCtx {
+      if (id === "webgl" || id === "webgl2") {
+        return {} as unknown as WebGLRenderingContext;
+      }
+      return orig ? orig.call(this, id, options) : null;
+    },
+  });
 });
 
 describe("ThreeScene", () => {
