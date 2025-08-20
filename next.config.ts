@@ -1,11 +1,15 @@
-import type { NextConfig } from "next";
-
-const nextConfig: NextConfig = {
-  // Explicitly allow LAN dev access (adjust as needed)
-  // See https://nextjs.org/docs/app/api-reference/config/next-config-js/allowedDevOrigins
-  experimental: {
-    // Add other experimental options here if needed
+const nextConfig = {
+  async headers() {
+    return [
+      {
+        source: '/textures/:path*',
+        headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
+      },
+      {
+        source: '/basis/:path*',
+        headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
+      },
+    ];
   },
 };
-
-export default nextConfig;
+module.exports = nextConfig;

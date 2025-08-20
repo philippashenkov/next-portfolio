@@ -1,46 +1,44 @@
 "use client";
-import React from "react";
+import { useEffect, useState } from "react";
 
-type Theme = "light" | "dark";
+type Props = {
+  className?: string;
+};
 
-function getInitialTheme(): Theme {
+const STORAGE_KEY = "theme";
+
+function getInitialTheme(): "light" | "dark" {
   if (typeof window === "undefined") return "light";
-  const stored = window.localStorage.getItem("theme");
-  if (stored === "dark" || stored === "light") return stored as Theme;
-  const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
-  return prefersDark ? "dark" : "light";
+  const saved = localStorage.getItem(STORAGE_KEY);
+  if (saved === "light" || saved === "dark") return saved;
+  return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
-export default function ThemeToggle() {
-  const [theme, setTheme] = React.useState<Theme>(getInitialTheme);
+export default function ThemeToggle({ className = "btn btn--toggle" }: Props) {
+  const [mounted, setMounted] = useState(false);
+  const [theme, setTheme] = useState<"light" | "dark">(getInitialTheme());
 
-  React.useEffect(() => {
-    const root = document.documentElement;
-    root.setAttribute("data-theme", theme);
-    try {
-      localStorage.setItem("theme", theme);
-    } catch {}
-  }, [theme]);
+  useEffect(() => setMounted(true), []);
+  useEffect(() => {
+    if (!mounted) return;
+    const el = document.documentElement;
+    el.setAttribute("data-theme", theme);
+    localStorage.setItem(STORAGE_KEY, theme);
+  }, [theme, mounted]);
 
-  const toggle = () => setTheme((t) => (t === "dark" ? "light" : "dark"));
+  if (!mounted) return null;
+
+  const next = theme === "dark" ? "light" : "dark";
 
   return (
     <button
-      onClick={toggle}
-      aria-label="Toggle theme"
-      title={theme === "dark" ? "Switch to light" : "Switch to dark"}
-      style={{
-        padding: "8px 12px",
-        borderRadius: 999,
-        border: "1px solid rgba(255,255,255,0.18)",
-        background: "rgba(255,255,255,0.10)",
-        color: "#fff",
-        cursor: "pointer",
-        fontFamily: "var(--font-orbitron)",
-        letterSpacing: 0.5,
-      }}
+      type="button"
+      className={className}
+      onClick={() => setTheme(next)}
+      aria-label={`Switch to ${next} theme`}
+      title={`Switch to ${next} theme`}
     >
-      {theme === "dark" ? "☀︎ Light" : "☾ Dark"}
+      {theme === "dark" ? "☀ Light" : "🌙 Dark"}
     </button>
   );
 }

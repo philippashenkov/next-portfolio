@@ -2,20 +2,41 @@
   --foreground: #0a0a0a;
   /* Light neon gradient (current) */
   --bg-start: #ffea00; /* yellow */
-  --bg-mid: #ffd07a;   /* warm */
+  --bg-mid: #ffe3ae;   /* warm */
   --bg-end: #00a3ff;   /* blue */
   --glass: rgba(255, 255, 255, 0.08);
   --border: rgba(255,255,255,0.18);
+  /* Header text colors (light theme defaults) */
+  --header-fg: #0b1020;
+  --header-fg-subtle: rgba(11, 16, 32, 0.82);
+  /* Button tokens (light theme defaults) */
+  --btn-fg: #0b1020;                 /* текст на светлой теме */
+  --btn-bg: rgba(10, 16, 32, 0.08);  /* мягкий теплый стеклянный фон */
+  --btn-bg-hover: rgba(10, 16, 32, 0.12);
+  --btn-bg-active: rgba(10, 16, 32, 0.16);
+  --btn-border: rgba(10, 16, 32, 0.24);
+  --btn-radius: 999px;
+  --btn-pad-y: 8px;
+  --btn-pad-x: 14px;
+  --btn-fw: 600;
 }
 
 /* Dark theme: neon pink/blue gradient */
 [data-theme="dark"] {
   --foreground: #e7e7ff;
-  --bg-start: #0b0215; /* near-black purple */
+     --bg-start: #0b0215; /* near-black purple */
   --bg-mid: #0b1a3a;   /* deep blue */
   --bg-end: #06121f;   /* space blue-black */
   --glass: rgba(255, 255, 255, 0.06);
   --border: rgba(255,255,255,0.14);
+  --header-fg: #e7e7ff;
+  --header-fg-subtle: rgba(4, 4, 16, 0.9);
+  /* Dark overrides: светлый текст и стекло */
+  --btn-fg: #f2f5ff;                 /* светлее текст кнопок */
+  --btn-bg: rgba(255, 255, 255, 0.06);
+  --btn-bg-hover: rgba(255, 255, 255, 0.10);
+  --btn-bg-active: rgba(255, 255, 255, 0.14);
+  --btn-border: rgba(255, 255, 255, 0.24);
 }
 
 html,
@@ -139,3 +160,94 @@ main.page {
   text-align: right;
   font-size: 12px;
 }
+
+/* Light theme contrast tweaks: darker text and punchier effects */
+[data-theme="light"] body {
+  color: #0b1020; /* deep navy for high contrast on yellow/blue */
+}
+[data-theme="light"] .hero-type {
+  color: #0a1f33;
+  opacity: 1; /* full opacity for readability */
+}
+[data-theme="light"] .tw-end {
+  color: #0a1f33;
+  opacity: 0.9;
+}
+[data-theme="light"] .sat {
+  background: radial-gradient(42% 42% at 38% 38%, #ffffff, #7fc8ff 55%, #1590ff 100%);
+  border-color: #0f6fe6;
+  box-shadow: 0 0 10px rgba(21, 144, 255, 0.85), 0 0 20px rgba(21, 144, 255, 0.55), 0 0 2px rgba(255,255,255,0.9) inset;
+}
+[data-theme="light"] .sat--back {
+  opacity: 0.55;
+  filter: brightness(1) saturate(1.1);
+}
+
+/* Buttons */
+.btn {
+  -webkit-tap-highlight-color: transparent;
+  appearance: none;
+  border: 1px solid var(--btn-border);
+  background: var(--btn-bg);
+  color: var(--btn-fg);
+  padding: var(--btn-pad-y) var(--btn-pad-x);
+  border-radius: var(--btn-radius);
+  font-weight: var(--btn-fw);
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  backdrop-filter: saturate(120%) blur(6px);
+  transition: background .2s ease, border-color .2s ease, color .2s ease, box-shadow .2s ease, transform .02s ease-in;
+}
+
+.btn:hover,
+.btn:focus-visible {
+  background: var(--btn-bg-hover);
+  border-color: color-mix(in oklab, var(--btn-border), currentColor 20%);
+  outline: none;
+}
+
+.btn:active {
+  background: var(--btn-bg-active);
+  transform: translateY(0.5px);
+}
+
+/* Активная кнопка — сильнее контраст и подсветка */
+.btn--active {
+  background: var(--btn-bg-active);
+  border-color: color-mix(in oklab, var(--btn-border), currentColor 30%);
+  box-shadow: 0 2px 10px rgba(0,0,0,0.12), 0 0 0 1px color-mix(in oklab, var(--btn-border), currentColor 28%) inset;
+}
+
+/* Активная в светлой теме — темнее фон, лучше на желтом */
+[data-theme="light"] .btn--active {
+  background: rgba(10, 16, 32, 0.22);
+  border-color: rgba(10, 16, 32, 0.35);
+  color: #0b1020;
+  box-shadow: 0 4px 16px rgba(10,16,32,0.15);
+}
+
+/* Активная в темной теме — светлее стекло и неоновая тень */
+[data-theme="dark"] .btn--active {
+  background: rgba(255,255,255,0.18);
+  border-color: rgba(255,255,255,0.36);
+  color: #ffffff;
+  box-shadow:
+    0 6px 18px rgba(64,176,255,0.18),
+    0 0 0 1px rgba(255,255,255,0.06) inset;
+}
+
+/* Переключатель темы: отдельный фон на светлой теме, чтобы выделялся */
+[data-theme="light"] .btn--toggle {
+  background: rgba(10, 16, 32, 0.22);
+  border-color: rgba(10, 16, 32, 0.35);
+  color: #0b1020;
+}
+[data-theme="light"] .btn--toggle:hover {
+  background: rgba(10, 16, 32, 0.26);
+}
+
+/* Расстояние между нав-кнопками */
+.nav-btn + .nav-btn { margin-left: 8px; }

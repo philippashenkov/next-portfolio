@@ -4,22 +4,17 @@ import { usePathname } from "next/navigation";
 import ThemeToggle from "./ThemeToggle";
 
 export default function Navbar() {
-  const pathname = usePathname();
+  const pathname = usePathname() || "/";
 
   const NavLink = ({ href, label }: { href: string; label: string }) => {
-    const active = pathname === href;
+    const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
+    const cls = `btn nav-btn${active ? " btn--active" : ""}`;
     return (
       <Link
         href={href}
         prefetch
-        style={{
-          padding: "8px 14px",
-          borderRadius: 999,
-          color: active ? "#fff" : "rgba(255,255,255,0.9)",
-          background: active ? "rgba(255,255,255,0.15)" : "transparent",
-          transition: "all 0.2s ease",
-          border: "1px solid rgba(255,255,255,0.12)",
-        }}
+        className={cls}
+        aria-current={active ? "page" : undefined}
       >
         {label}
       </Link>
@@ -34,9 +29,9 @@ export default function Navbar() {
         left: 0,
         right: 0,
         zIndex: 50,
-  backdropFilter: "blur(6px)",
-  WebkitBackdropFilter: "blur(6px)",
-  borderBottom: "1px solid var(--border)",
+        backdropFilter: "blur(6px)",
+        WebkitBackdropFilter: "blur(6px)",
+        borderBottom: "1px solid var(--border)",
       }}
     >
       <nav
@@ -47,17 +42,28 @@ export default function Navbar() {
           maxWidth: 1200,
           margin: "0 auto",
           padding: "0.6rem 1rem",
-          color: "#fff",
+          color: "var(--header-fg)",
         }}
       >
-        <Link href="/" style={{ color: "#fff", fontWeight: 700, fontFamily: "var(--font-orbitron)", letterSpacing: 1 }}>
+        <Link
+          href="/"
+          style={{
+            color: "var(--header-fg)",
+            fontWeight: 700,
+            fontFamily: "var(--font-orbitron)",
+            letterSpacing: 1,
+          }}
+        >
           PA • Portfolio
         </Link>
+
+        {/* Кнопка переключения темы — внутри компонента желательно задать className="btn" */}
+        <ThemeToggle />
+
         <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
           <NavLink href="/" label="Home" />
           <NavLink href="/about" label="About" />
           <NavLink href="/contacts" label="Contacts" />
-          <ThemeToggle />
         </div>
       </nav>
     </header>
