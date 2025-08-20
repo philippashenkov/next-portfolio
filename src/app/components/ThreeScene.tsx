@@ -70,7 +70,11 @@ export default function ThreeScene() {
     const ambient = new THREE.AmbientLight(0x4060a0, 0.4);
     scene.add(keyLight, rimLight, ambient);
 
-    // Starfield background
+  // Theme awareness (for light theme contrast)
+  const themeAttr = typeof document !== 'undefined' ? document.documentElement.getAttribute('data-theme') : null;
+  const IS_LIGHT = themeAttr !== 'dark';
+
+  // Starfield background
   const starsGeom = new THREE.BufferGeometry();
   const starCount = CFG.STARS;
   const positions = new Float32Array(starCount * 3);
@@ -83,7 +87,15 @@ export default function ThreeScene() {
       positions[i * 3 + 2] = r * Math.cos(p);
     }
   starsGeom.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-  const starMat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.2, sizeAttenuation: true });
+  const starMat = new THREE.PointsMaterial({
+    color: IS_LIGHT ? 0x9ad6ff : 0xffffff,
+    size: IS_LIGHT ? 0.28 : 0.2,
+    sizeAttenuation: true,
+    transparent: IS_LIGHT,
+    opacity: IS_LIGHT ? 0.95 : 1,
+    blending: IS_LIGHT ? THREE.AdditiveBlending : THREE.NormalBlending,
+    depthWrite: !IS_LIGHT,
+  });
   const stars = new THREE.Points(starsGeom, starMat);
     scene.add(stars);
 
@@ -103,7 +115,7 @@ export default function ThreeScene() {
       roughness: 0.8,
       metalness: 0.1,
       emissive: 0x0a1a3a,
-      emissiveIntensity: 0.2,
+      emissiveIntensity: IS_LIGHT ? 0.3 : 0.2,
     });
     const earth = new THREE.Mesh(earthGeom, earthMat);
     earthGroup.add(earth);
@@ -113,7 +125,7 @@ export default function ThreeScene() {
     const atmoMat = new THREE.MeshBasicMaterial({
       color: 0x66ccff,
       transparent: true,
-      opacity: 0.25,
+      opacity: IS_LIGHT ? 0.32 : 0.25,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
     });
@@ -358,7 +370,14 @@ export default function ThreeScene() {
 
             // Orbit ring in the plane (ring lies in XY by default; rotate by same q)
             const orbit = new THREE.RingGeometry(radius - 0.001, radius + 0.001, CFG.RING_SEG);
-            const orbitMat = new THREE.MeshBasicMaterial({ color: 0xffffff, opacity: 0.2, transparent: true, side: THREE.DoubleSide });
+            const orbitMat = new THREE.MeshBasicMaterial({
+              color: IS_LIGHT ? 0x9ad6ff : 0xffffff,
+              opacity: IS_LIGHT ? 0.28 : 0.2,
+              transparent: true,
+              side: THREE.DoubleSide,
+              blending: IS_LIGHT ? THREE.AdditiveBlending : THREE.NormalBlending,
+              depthWrite: !IS_LIGHT,
+            });
             const orbitMesh = new THREE.Mesh(orbit, orbitMat);
             orbitMesh.rotation.x = 0; // stays in XY for plane local space
             orbitMesh.quaternion.copy(new THREE.Quaternion()); // identity in plane space

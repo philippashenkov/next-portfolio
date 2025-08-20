@@ -16,6 +16,9 @@ export interface TypewriterProps {
   showEndSignature?: boolean;
   endSignature?: string;
   endSignatureDelayMs?: number;
+  // If provided, used to persist completion across navigations within the session
+  // When the same key and content version are found, the text renders fully without retyping
+  persistKey?: string;
 }
 
 const cursorGlyph: Record<CursorStyle, string> = {
@@ -35,15 +38,47 @@ export const Typewriter: React.FC<TypewriterProps> = ({
   showEndSignature = true,
   endSignature = "EOF",
   endSignatureDelayMs = 200,
+  persistKey,
 }) => {
   const [typed, setTyped] = React.useState<string[]>(() => Array(lines.length).fill(""));
   const [done, setDone] = React.useState(false);
   const [activeLine, setActiveLine] = React.useState(0);
   const [sigShown, setSigShown] = React.useState(false);
+  const [isHydrated, setIsHydrated] = React.useState(false);
+
+  // A simple content version derived from props so cache invalidates if content changes
+  const contentVersion = React.useMemo(() => {
+    return `${lines.length}|${lines.join("\n")}||${endSignature}`;
+  }, [lines, endSignature]);
+
+  React.useEffect(() => {
+    // Ensure we only decide behavior after hydration to avoid SSR/CSR mismatches
+    setIsHydrated(true);
+  }, []);
 
   React.useEffect(() => {
     let cancelled = false;
-    const prefersReduced = typeof window !== "undefined" && window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    // If we have a persisted completion for this key+version, render fully and skip typing
+    if (typeof window !== "undefined" && persistKey) {
+      try {
+        const raw = sessionStorage.getItem(`tw:${persistKey}`);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && parsed.version === contentVersion && parsed.done === true) {
+            if (!cancelled) {
+              setTyped([...lines]);
+              setDone(true);
+              if (showEndSignature) setSigShown(true);
+            }
+            return () => {
+              cancelled = true;
+            };
+          }
+        }
+      } catch {}
+    }
+
+  const prefersReduced = typeof window !== "undefined" && window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     async function typeAll() {
       if (prefersReduced) {
@@ -53,6 +88,10 @@ export const Typewriter: React.FC<TypewriterProps> = ({
           setDone(true);
           if (showEndSignature) {
             setTimeout(() => !cancelled && setSigShown(true), endSignatureDelayMs);
+          }
+          // Persist completion state
+          if (persistKey && typeof window !== "undefined") {
+            try { sessionStorage.setItem(`tw:${persistKey}`, JSON.stringify({ done: true, version: contentVersion })); } catch {}
           }
         }
         return;
@@ -85,6 +124,10 @@ export const Typewriter: React.FC<TypewriterProps> = ({
         if (showEndSignature) {
           setTimeout(() => !cancelled && setSigShown(true), endSignatureDelayMs);
         }
+        // Persist completion state
+        if (persistKey && typeof window !== "undefined") {
+          try { sessionStorage.setItem(`tw:${persistKey}`, JSON.stringify({ done: true, version: contentVersion })); } catch {}
+        }
       }
     }
 
@@ -92,9 +135,14 @@ export const Typewriter: React.FC<TypewriterProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [lines, speedMsPerChar, lineDelayMs, startDelayMs, showEndSignature, endSignatureDelayMs]);
+  }, [lines, speedMsPerChar, lineDelayMs, startDelayMs, showEndSignature, endSignatureDelayMs, persistKey, contentVersion]);
 
   const cursor = cursorGlyph[cursorStyle];
+
+  // During SSR and the very first client render, render a stable shell to avoid hydration mismatches
+  if (!isHydrated) {
+    return <div className={className} />;
+  }
 
   return (
     <div className={className} style={{ position: "relative" }}>

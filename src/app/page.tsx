@@ -21,6 +21,7 @@ export default function Home() {
             lineDelayMs={120}
             startDelayMs={200}
             cursorStyle="block"
+            persistKey="home-hero-v1"
             lines={[
               "> booting interface...",
               "> loading modules: [three.js] [next.js] [signals] [visual-core]",
