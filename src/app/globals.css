@@ -1,9 +1,21 @@
 :root {
   --foreground: #0a0a0a;
+  /* Light neon gradient (current) */
   --bg-start: #ffea00; /* yellow */
   --bg-mid: #ffd07a;   /* warm */
   --bg-end: #00a3ff;   /* blue */
   --glass: rgba(255, 255, 255, 0.08);
+  --border: rgba(255,255,255,0.18);
+}
+
+/* Dark theme: neon pink/blue gradient */
+[data-theme="dark"] {
+  --foreground: #e7e7ff;
+  --bg-start: #0b0215; /* near-black purple */
+  --bg-mid: #0b1a3a;   /* deep blue */
+  --bg-end: #06121f;   /* space blue-black */
+  --glass: rgba(255, 255, 255, 0.06);
+  --border: rgba(255,255,255,0.14);
 }
 
 html,
@@ -14,7 +26,9 @@ body {
 
 body {
   color: #fff;
-  background: linear-gradient(135deg, var(--bg-start), var(--bg-mid) 40%, var(--bg-end));
+  background: radial-gradient(1200px 800px at 10% -10%, rgba(255,0,136,0.18), transparent 45%),
+              radial-gradient(1000px 700px at 100% 0%, rgba(0,170,255,0.16), transparent 50%),
+              linear-gradient(135deg, var(--bg-start), var(--bg-mid) 40%, var(--bg-end));
   min-height: 100vh;
   font-family: var(--font-geist-sans, Arial, Helvetica, sans-serif);
   -webkit-font-smoothing: antialiased;
@@ -82,9 +96,17 @@ main.page {
 /* Subtle scanline + retro glow */
 .retro-card {
   background: var(--glass);
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  border: 1px solid var(--border);
   box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.25);
   border-radius: 16px;
+}
+
+/* Optional: neon accents on dark */
+[data-theme="dark"] .retro-card {
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,0.04) inset,
+    0 12px 40px rgba(255, 64, 160, 0.18),
+    0 6px 24px rgba(64, 176, 255, 0.16);
 }
 
 /* DOM satellites rendered over the canvas */

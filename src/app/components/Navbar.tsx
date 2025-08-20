@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import ThemeToggle from "./ThemeToggle";
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -33,9 +34,9 @@ export default function Navbar() {
         left: 0,
         right: 0,
         zIndex: 50,
-        backdropFilter: "blur(6px)",
-        WebkitBackdropFilter: "blur(6px)",
-        borderBottom: "1px solid rgba(255,255,255,0.15)",
+  backdropFilter: "blur(6px)",
+  WebkitBackdropFilter: "blur(6px)",
+  borderBottom: "1px solid var(--border)",
       }}
     >
       <nav
@@ -52,10 +53,11 @@ export default function Navbar() {
         <Link href="/" style={{ color: "#fff", fontWeight: 700, fontFamily: "var(--font-orbitron)", letterSpacing: 1 }}>
           PA • Portfolio
         </Link>
-        <div style={{ display: "flex", gap: "0.5rem" }}>
+        <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
           <NavLink href="/" label="Home" />
           <NavLink href="/about" label="About" />
           <NavLink href="/contacts" label="Contacts" />
+          <ThemeToggle />
         </div>
       </nav>
     </header>

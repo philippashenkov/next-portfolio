@@ -33,8 +33,22 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable} ${orbitron.variable}`}>
+        {/* Set initial theme to avoid flash */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function(){
+                try {
+                  var t = localStorage.getItem('theme');
+                  if(!t){ t = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'; }
+                  document.documentElement.setAttribute('data-theme', t);
+                } catch {}
+              })();
+            `,
+          }}
+        />
         <Navbar />
         {children}
         <SkyStreaks />
