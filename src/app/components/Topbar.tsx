@@ -18,7 +18,10 @@ export default function Topbar() {
     const next = theme === "light" ? "dark" : "light";
     setTheme(next);
     document.documentElement.setAttribute("data-theme", next);
-    try { localStorage.setItem("theme", next); } catch {}
+    try {
+      localStorage.setItem("theme", next);
+      document.cookie = `theme=${next}; path=/; max-age=31536000; SameSite=Lax`;
+    } catch {}
   };
 
   return (
@@ -37,7 +40,7 @@ export default function Topbar() {
           onClick={toggleTheme}
           title={`Theme: ${theme}`}
         >
-          <span aria-hidden>✻</span>
+          <span aria-hidden>{theme === "light" ? "☀" : "☽"}</span>
           <span data-label style={{ marginLeft: 6 }}>{theme === "light" ? "Light" : "Dark"}</span>
         </button>
 
