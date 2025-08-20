@@ -55,14 +55,21 @@ export default function ThreeScene() {
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, CFG.MAX_DPR));
-  // Ensure correct color space (r152+ / legacy compatibility)
-  type RendererCS = { outputColorSpace?: unknown; outputEncoding?: unknown };
-  if ((renderer as unknown as RendererCS).outputColorSpace !== undefined) {
-    (renderer as unknown as { outputColorSpace: THREE.ColorSpace }).outputColorSpace = THREE.SRGBColorSpace as unknown as THREE.ColorSpace;
-  } else {
-    (renderer as unknown as { outputEncoding: THREE.TextureEncoding }).outputEncoding = THREE.sRGBEncoding as unknown as THREE.TextureEncoding;
+
+  // Version-safe color space setup (no sRGBEncoding import)
+  {
+    const r = renderer as THREE.WebGLRenderer & { outputColorSpace?: unknown; outputEncoding?: number };
+    if ('outputColorSpace' in r) {
+      // three r152+
+      const SRGB = (THREE as unknown as { SRGBColorSpace?: string }).SRGBColorSpace ?? 'srgb';
+      r.outputColorSpace = SRGB;
+    } else if ('outputEncoding' in r) {
+        // legacy three: numeric enum value for sRGBEncoding
+        (r as THREE.WebGLRenderer & { outputEncoding?: number }).outputEncoding = 3001;
+      }
   }
-      // Settings (reduced-motion aware)
+
+  // Settings
   renderer.shadowMap.enabled = false;
   renderer.domElement.style.position = "absolute";
   renderer.domElement.style.inset = "0";

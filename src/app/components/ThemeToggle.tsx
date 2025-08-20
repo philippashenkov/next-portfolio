@@ -38,7 +38,7 @@ export default function ThemeToggle({ className = "btn btn--toggle" }: Props) {
       aria-label={`Switch to ${next} theme`}
       title={`Switch to ${next} theme`}
     >
-      {theme === "dark" ? "☀ Light" : "🌙 Dark"}
+      {theme === "dark" ? "☀ Light" : "☽ Dark"}
     </button>
   );
 }
