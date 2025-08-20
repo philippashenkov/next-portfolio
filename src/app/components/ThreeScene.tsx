@@ -7,6 +7,7 @@ declare global {
   var __IS_TEST__: boolean | undefined;
 }
 import * as THREE from "three";
+import { loadPlanetTexture } from "@/three/planetTexture";
 
 export default function ThreeScene() {
   const mountRef = useRef<HTMLDivElement>(null);
@@ -54,6 +55,13 @@ export default function ThreeScene() {
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, CFG.MAX_DPR));
+  // Ensure correct color space (r152+ / legacy compatibility)
+  type RendererCS = { outputColorSpace?: unknown; outputEncoding?: unknown };
+  if ((renderer as unknown as RendererCS).outputColorSpace !== undefined) {
+    (renderer as unknown as { outputColorSpace: THREE.ColorSpace }).outputColorSpace = THREE.SRGBColorSpace as unknown as THREE.ColorSpace;
+  } else {
+    (renderer as unknown as { outputEncoding: THREE.TextureEncoding }).outputEncoding = THREE.sRGBEncoding as unknown as THREE.TextureEncoding;
+  }
       // Settings (reduced-motion aware)
   renderer.shadowMap.enabled = false;
   renderer.domElement.style.position = "absolute";
@@ -119,6 +127,20 @@ export default function ThreeScene() {
     });
     const earth = new THREE.Mesh(earthGeom, earthMat);
     earthGroup.add(earth);
+
+    // Async load of optimized planet texture (KTX2 with fallback)
+    const texAbort = new AbortController();
+    (async () => {
+      try {
+        const tex = await loadPlanetTexture({ renderer, signal: texAbort.signal });
+        earthMat.map = tex;
+        earthMat.color.set(0xffffff);
+        earthMat.needsUpdate = true;
+        tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+      } catch {
+        // keep placeholder
+      }
+    })();
 
     // Atmosphere glow (faked with additive transparent sphere)
     const atmoGeom = new THREE.SphereGeometry(1.48, CFG.SPHERE_SEG, CFG.SPHERE_SEG);
@@ -540,6 +562,7 @@ export default function ThreeScene() {
 
     // Cleanup
     return () => {
+      texAbort.abort();
       cancelAnimationFrame(raf);
   window.removeEventListener("resize", onResize);
   mo.disconnect();
