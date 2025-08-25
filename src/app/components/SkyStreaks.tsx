@@ -2,215 +2,311 @@
 import { useEffect, useRef } from "react";
 
 type Spark = {
-    x: number; y: number;
-    px: number; py: number;
-    vx: number; vy: number;
-    life: number;
-    ttl: number; // seconds
-    width: number;
-    hue: number;
+  x: number; y: number;
+  px: number; py: number;
+  vx: number; vy: number;
+  life: number;
+  ttl: number;      // seconds
+  width: number;
 };
 
+type ThemeVars = {
+  core: string;     // hex or css color
+  main: string;
+  edge: string;
+  glow: string;
+  opacity: number;  // 0..1
+  bloom: number;    // 0..2+
+  mode: "light" | "dark" | "unknown";
+};
+
+function readTheme(): ThemeVars {
+  const el = document.documentElement;
+  const cs = getComputedStyle(el);
+  const get = (v: string, d = "") => (cs.getPropertyValue(v).trim() || d);
+  const toNum = (v: string, d: number) => {
+    const n = parseFloat(v);
+    return Number.isFinite(n) ? n : d;
+  };
+  const modeAttr = (el.getAttribute("data-theme") || "").toLowerCase();
+  const mode: ThemeVars["mode"] =
+    modeAttr === "light" || modeAttr === "dark" ? (modeAttr as ThemeVars["mode"]) : "unknown";
+  return {
+    core: get("--streak-core", "#fff6dd"),
+    main: get("--streak-main", "#ff6a00"),
+    edge: get("--streak-edge", "#ff2d00"),
+    glow: get("--streak-glow", "#ff67f2ff"),
+    opacity: toNum(get("--streak-opacity"), 0.88),
+    bloom: toNum(get("--streak-bloom"), 1.2),
+    mode,
+  };
+}
+
+function hexToRgb(col: string): { r: number; g: number; b: number } {
+  // Supports #rgb, #rrggbb, rgb(), hsl() passthrough via canvas
+  if (col.startsWith("#")) {
+    let hex = col.slice(1);
+    if (hex.length === 3) hex = hex.split("").map(c => c + c).join("");
+    const num = parseInt(hex, 16);
+    return { r: (num >> 16) & 255, g: (num >> 8) & 255, b: num & 255 };
+  }
+  // Fallback parse via offscreen canvas (handles named/rgb/hsl)
+  const c = document.createElement("canvas");
+  c.width = c.height = 1;
+  const ctx = c.getContext("2d");
+  if (!ctx) return { r: 255, g: 255, b: 255 };
+  ctx.fillStyle = col;
+  const computed = ctx.fillStyle as string;
+  // computed should be rgb(a)
+  const m = computed.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
+  if (m) return { r: +m[1], g: +m[2], b: +m[3] };
+  return { r: 255, g: 255, b: 255 };
+}
+
+function withAlpha(col: string, a: number): string {
+  const { r, g, b } = hexToRgb(col);
+  const alpha = Math.max(0, Math.min(1, a));
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 export default function SkyStreaks() {
-    const trailRef = useRef<HTMLCanvasElement>(null);
-    const headRef = useRef<HTMLCanvasElement>(null);
-    const rafRef = useRef<number | null>(null);
-    const spawnTimerRef = useRef<number | null>(null);
-    const runningRef = useRef(true);
+  const trailRef = useRef<HTMLCanvasElement>(null);
+  const headRef = useRef<HTMLCanvasElement>(null);
+  const rafRef = useRef<number | null>(null);
+  const spawnTimerRef = useRef<number | null>(null);
+  const runningRef = useRef(true);
+  const themeRef = useRef<ThemeVars | null>(null);
 
-    useEffect(() => {
-        const trailCanvas = trailRef.current!;
-        const headCanvas = headRef.current!;
-        const trail = trailCanvas.getContext("2d", { alpha: true })!;
-        const head = headCanvas.getContext("2d", { alpha: true })!;
+  useEffect(() => {
+    const trailCanvas = trailRef.current;
+    const headCanvas = headRef.current;
+    if (!trailCanvas || !headCanvas) return;
 
-        const prefersReduce = typeof window !== "undefined" &&
-            window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const trail = trailCanvas.getContext("2d", { alpha: true });
+    const head = headCanvas.getContext("2d", { alpha: true });
+    if (!trail || !head) return;
 
-        // Настройки визуала
-        const CFG = {
-            USE_ADDITIVE_TAIL: false,
-            TAIL_SEC: 0.035,          // короче база
-            TAIL_MIN: 8,              // короче минимум
-            TAIL_MAX: 28,             // короче максимум
-            HEAD_RADIUS_SCALE: 0.7,   // чуть больше головка
-        } as const;
+    themeRef.current = readTheme();
+    const observer = new MutationObserver(() => {
+      themeRef.current = readTheme();
+    });
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-theme"],
+    });
 
-        let dpr = Math.min(window.devicePixelRatio || 1, 2);
-        let w = window.innerWidth, h = window.innerHeight;
+    const prefersReduce =
+      typeof window !== "undefined" &&
+      window.matchMedia &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-        const applySize = (c: HTMLCanvasElement, ctx: CanvasRenderingContext2D) => {
-            c.style.width = w + "px";
-            c.style.height = h + "px";
-            c.width = Math.floor(w * dpr);
-            c.height = Math.floor(h * dpr);
-            ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // рисуем в CSS-пикселях
-        };
-        const resize = () => {
-            dpr = Math.min(window.devicePixelRatio || 1, 2);
-            w = window.innerWidth; h = window.innerHeight;
-            applySize(trailCanvas, trail);
-            applySize(headCanvas, head);
-        };
-        resize();
+    // Настройки в зависимости от темы
+    const getCfg = () => {
+      const t = themeRef.current!;
+      const isLight = t.mode === "light" || t.mode === "unknown"; // default: ярко
+      return {
+        USE_ADDITIVE_TAIL: true,                 // яркий “огненный” хвост
+        TAIL_SEC: isLight ? 0.09 : 0.08,         // чуть длиннее в светлой
+        TAIL_MIN: isLight ? 15 : 8,
+        TAIL_MAX: isLight ? 46 : 28,
+        HEAD_RADIUS_SCALE: isLight ? 0.9 : 0.7,  // больше “головка” в светлой теме
+        TRAIL_SHADOW: isLight ? 14 : 8,          // усиленная “отблеск”
+      } as const;
+    };
 
-        const sparks: Spark[] = [];
-        // Не отключаем полностью при reduce-motion
-        const MAX_CONCURRENT = prefersReduce ? 2 : 6;
+    let dpr = Math.min(window.devicePixelRatio || 1, 2);
+    let w = window.innerWidth, h = window.innerHeight;
 
-        const spawn = () => {
-            // всегда перепланируем следующий запуск
-            const delay = 500 + Math.random() * 500; // ~0.5–1.0 c
-            if (runningRef.current && sparks.length < MAX_CONCURRENT) {
-                // старт с края
-                const edge = Math.floor(Math.random() * 4);
-                const margin = Math.max(w, h) * 0.15;
-                let x = 0, y = 0;
-                if (edge === 0) { x = -margin; y = Math.random() * h; }
-                else if (edge === 1) { x = w + margin; y = Math.random() * h; }
-                else if (edge === 2) { x = Math.random() * w; y = -margin; }
-                else { x = Math.random() * w; y = h + margin; }
-                // прямая траектория
-                const angle = Math.random() * Math.PI * 2;
-                const speed = 700 + Math.random() * 900;
-                const vx = Math.cos(angle) * speed;
-                const vy = Math.sin(angle) * speed;
-                const ttl = 0.6 + Math.random() * 1.1;
-                const width = 0.8 + Math.random() * 1.4;
-                const hue = 195 + Math.random() * 30;
-                sparks.push({ x, y, px: x, py: y, vx, vy, life: 0, ttl, width, hue });
-            }
-            spawnTimerRef.current = window.setTimeout(spawn, delay);
-        };
-        spawn();
+    const applySize = (c: HTMLCanvasElement, ctx: CanvasRenderingContext2D) => {
+      c.style.width = w + "px";
+      c.style.height = h + "px";
+      c.width = Math.max(1, Math.floor(w * dpr));
+      c.height = Math.max(1, Math.floor(h * dpr));
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // рисуем в CSS-пикселях
+    };
+    const resize = () => {
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      w = window.innerWidth; h = window.innerHeight;
+      applySize(trailCanvas, trail);
+      applySize(headCanvas, head);
+    };
+    resize();
 
-        let last = performance.now();
-        const loop = () => {
-            const now = performance.now();
-            const dt = Math.min(0.05, (now - last) / 1000);
-            last = now;
+    const sparks: Spark[] = [];
+    const MAX_CONCURRENT = prefersReduce ? 2 : 6;
 
-            // Полное очищение обоих слоёв каждый кадр (никаких “следов”)
-            // trail
-            trail.save();
-            trail.setTransform(1, 0, 0, 1, 0, 0);
-            trail.clearRect(0, 0, trailCanvas.width, trailCanvas.height);
-            trail.restore();
-            trail.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const spawn = () => {
+      const delay = prefersReduce ? 800 + Math.random() * 800 : 450 + Math.random() * 500;
+      if (runningRef.current && sparks.length < MAX_CONCURRENT) {
+        // старт с края
+        const edge = Math.floor(Math.random() * 4);
+        const margin = Math.max(w, h) * 0.15;
+        let x = 0, y = 0;
+        if (edge === 0) { x = -margin; y = Math.random() * h; }
+        else if (edge === 1) { x = w + margin; y = Math.random() * h; }
+        else if (edge === 2) { x = Math.random() * w; y = -margin; }
+        else { x = Math.random() * w; y = h + margin; }
 
-            // heads
-            head.save();
-            head.setTransform(1, 0, 0, 1, 0, 0);
-            head.clearRect(0, 0, headCanvas.width, headCanvas.height);
-            head.restore();
-            head.setTransform(dpr, 0, 0, dpr, 0, 0);
+        const angle = Math.random() * Math.PI * 2;
+        const baseSpeed = prefersReduce ? 500 : 700;
+        const speed = baseSpeed + Math.random() * (prefersReduce ? 500 : 900);
+        const vx = Math.cos(angle) * speed;
+        const vy = Math.sin(angle) * speed;
 
-            // Рисуем кометы
-            trail.save();
-            trail.globalCompositeOperation = CFG.USE_ADDITIVE_TAIL ? "lighter" : "source-over";
-            head.save();
-            head.globalCompositeOperation = "lighter";
+        const ttl = (prefersReduce ? 0.6 : 0.7) + Math.random() * (prefersReduce ? 0.8 : 1.1);
+        const width = (prefersReduce ? 0.7 : 0.9) + Math.random() * 1.6;
+        sparks.push({ x, y, px: x, py: y, vx, vy, life: 0, ttl, width });
+      }
+      spawnTimerRef.current = window.setTimeout(spawn, delay);
+    };
+    spawn();
 
-            for (let i = sparks.length - 1; i >= 0; i--) {
-                const s = sparks[i];
-                s.life += dt;
+    let last = performance.now();
+    const loop = () => {
+      const now = performance.now();
+      const dt = Math.min(0.05, (now - last) / 1000);
+      last = now;
 
-                s.px = s.x; s.py = s.y;
-                s.x += s.vx * dt;
-                s.y += s.vy * dt;
+      const theme = themeRef.current || readTheme();
+      const cfg = getCfg();
 
-                const t = 1 - Math.min(1, s.life / s.ttl);
-                const alpha = Math.pow(t, 0.6);
+      // Полное очищение обоих слоёв каждый кадр
+      // trail
+      trail.save();
+      trail.setTransform(1, 0, 0, 1, 0, 0);
+      trail.clearRect(0, 0, trailCanvas.width, trailCanvas.height);
+      trail.restore();
+      trail.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-                // КОРОТКИЙ ХВОСТ (без накопления)
-                const speed = Math.hypot(s.vx, s.vy);
-                const tailLen = Math.max(CFG.TAIL_MIN, Math.min(CFG.TAIL_MAX, speed * CFG.TAIL_SEC));
-                const nx = s.vx / (speed || 1);
-                const ny = s.vy / (speed || 1);
-                const x0 = s.x - nx * tailLen;
-                const y0 = s.y - ny * tailLen;
+      // heads
+      head.save();
+      head.setTransform(1, 0, 0, 1, 0, 0);
+      head.clearRect(0, 0, headCanvas.width, headCanvas.height);
+      head.restore();
+      head.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-                // Один штрих, без blur, заметнее по яркости и толщине
-                const grad = trail.createLinearGradient(x0, y0, s.x, s.y);
-                grad.addColorStop(0.0, `hsla(${s.hue}, 100%, 65%, 0)`);
-                grad.addColorStop(0.6, `hsla(${s.hue}, 100%, 80%, ${alpha * 0.30})`);
-                grad.addColorStop(1.0, `hsla(${s.hue}, 100%, 60%, ${alpha})`);
-                trail.strokeStyle = grad;
-                trail.shadowBlur = 0;
-                trail.lineCap = "round";
-                trail.lineJoin = "round";
-                trail.lineWidth = s.width * 1.7;  // было ~1px → делаем 1.3–2.4px
-                trail.beginPath();
-                trail.moveTo(x0, y0);
-                trail.lineTo(s.x, s.y);
-                trail.stroke();
+      // Рисуем кометы
+      trail.save();
+      trail.globalCompositeOperation = cfg.USE_ADDITIVE_TAIL ? "lighter" : "source-over";
+      head.save();
+      head.globalCompositeOperation = "lighter";
 
-                // МАЛЕНЬКАЯ ГОЛОВКА (очищаемый слой каждый кадр)
-                const headR = Math.max(0.6, s.width * CFG.HEAD_RADIUS_SCALE);
-                const glowR = headR * 2.4;
-                const g2 = head.createRadialGradient(s.x, s.y, 0, s.x, s.y, glowR);
-                g2.addColorStop(0, `hsla(${s.hue}, 100%, 98%, ${alpha})`);
-                g2.addColorStop(1, `hsla(${s.hue}, 100%, 70%, 0)`);
-                head.fillStyle = g2;
-                head.shadowColor = `hsla(${s.hue}, 100%, 85%, ${alpha})`;
-                head.shadowBlur = 7;
-                head.beginPath();
-                head.arc(s.x, s.y, headR, 0, Math.PI * 2);
-                head.fill();
+      const opa = theme.opacity;
+      const bloom = theme.bloom;
 
-                if (s.life >= s.ttl) sparks.splice(i, 1);
-            }
+      for (let i = sparks.length - 1; i >= 0; i--) {
+        const s = sparks[i];
+        s.life += dt;
 
-            head.restore();
-            trail.restore();
+        s.px = s.x; s.py = s.y;
+        s.x += s.vx * dt;
+        s.y += s.vy * dt;
 
-            if (runningRef.current) {
-                rafRef.current = requestAnimationFrame(loop);
-            } else {
-                // важно: дать onVis шанс перезапустить цикл
-                rafRef.current = null;
-            }
-        };
+        const t = 1 - Math.min(1, s.life / s.ttl);
+        const alpha = Math.pow(t, 0.6) * opa;
+
+        // КОРОТКИЙ ЯРКИЙ ХВОСТ
+        const speed = Math.hypot(s.vx, s.vy);
+        const nx = s.vx / (speed || 1);
+        const ny = s.vy / (speed || 1);
+        const tailLen = Math.max(cfg.TAIL_MIN, Math.min(cfg.TAIL_MAX, speed * cfg.TAIL_SEC));
+        const x0 = s.x - nx * tailLen;
+        const y0 = s.y - ny * tailLen;
+
+        const grad = trail.createLinearGradient(x0, y0, s.x, s.y);
+        // прозрачное начало → основная “огненная” → горячая кромка
+        grad.addColorStop(0.00, withAlpha(theme.main, 0.00));
+        grad.addColorStop(0.55, withAlpha(theme.main, Math.min(0.38, alpha * 0.45)));
+        grad.addColorStop(0.86, withAlpha(theme.edge, Math.min(0.85, alpha * 0.9)));
+        grad.addColorStop(1.00, withAlpha(theme.edge, Math.min(1.0, alpha)));
+
+        trail.strokeStyle = grad;
+        trail.lineCap = "round";
+        trail.lineJoin = "round";
+        trail.lineWidth = s.width * (theme.mode === "dark" ? 1.6 : 2.0);
+        trail.shadowColor = withAlpha(theme.glow, Math.min(0.7, alpha * 0.7));
+        trail.shadowBlur = cfg.TRAIL_SHADOW * bloom;
+
+        trail.beginPath();
+        trail.moveTo(x0, y0);
+        trail.lineTo(s.x, s.y);
+        trail.stroke();
+
+        // ГОЛОВКА С ЯДРОМ И ГАЛО
+        const headR = Math.max(0.7, s.width * cfg.HEAD_RADIUS_SCALE);
+        const glowR = headR * (2.8 + bloom * 0.6);
+
+        // внешнее гало
+        const g2 = head.createRadialGradient(s.x, s.y, 0, s.x, s.y, glowR);
+        g2.addColorStop(0, withAlpha(theme.core, Math.min(1.0, alpha)));
+        g2.addColorStop(1, withAlpha(theme.glow, 0));
+        head.fillStyle = g2;
+        head.shadowColor = withAlpha(theme.glow, Math.min(0.9, alpha));
+        head.shadowBlur = 9 + bloom * 8;
+        head.beginPath();
+        head.arc(s.x, s.y, headR, 0, Math.PI * 2);
+        head.fill();
+
+        // маленькое “ядро” для контраста
+        head.shadowBlur = 0;
+        head.fillStyle = withAlpha(theme.core, Math.min(1.0, alpha));
+        head.beginPath();
+        head.arc(s.x, s.y, Math.max(0.4, headR * 0.55), 0, Math.PI * 2);
+        head.fill();
+
+        if (s.life >= s.ttl) sparks.splice(i, 1);
+      }
+
+      head.restore();
+      trail.restore();
+
+      if (runningRef.current) {
         rafRef.current = requestAnimationFrame(loop);
+      } else {
+        rafRef.current = null;
+      }
+    };
+    rafRef.current = requestAnimationFrame(loop);
 
-        const onVis = () => {
-            const visible = document.visibilityState === "visible";
-            runningRef.current = visible;
-            if (visible) {
-                last = performance.now();
-                if (rafRef.current == null) {
-                    rafRef.current = requestAnimationFrame(loop);
-                }
-                if (spawnTimerRef.current == null) {
-                    spawn(); // перестраховка: восстановить цепочку спавна
-                }
-            }
-        };
+    const onVis = () => {
+      const visible = document.visibilityState === "visible";
+      runningRef.current = visible;
+      if (visible) {
+        last = performance.now();
+        if (rafRef.current == null) rafRef.current = requestAnimationFrame(loop);
+        if (spawnTimerRef.current == null) spawn();
+      }
+    };
 
-        window.addEventListener("resize", resize);
-        document.addEventListener("visibilitychange", onVis);
+    const onResize = () => resize();
 
-        return () => {
-            runningRef.current = false;
-            if (rafRef.current) cancelAnimationFrame(rafRef.current);
-            if (spawnTimerRef.current) clearTimeout(spawnTimerRef.current);
-            window.removeEventListener("resize", resize);
-            document.removeEventListener("visibilitychange", onVis);
-        };
-    }, []);
+    window.addEventListener("resize", onResize);
+    document.addEventListener("visibilitychange", onVis);
 
-    return (
-        <>
-            <canvas
-                ref={trailRef}
-                aria-hidden
-                style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 30 }}  // выше большинства слоёв
-            />
-            <canvas
-                ref={headRef}
-                aria-hidden
-                style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 31 }}
-            />
-        </>
-    );
+    return () => {
+      observer.disconnect();
+      runningRef.current = false;
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      if (spawnTimerRef.current) clearTimeout(spawnTimerRef.current);
+      window.removeEventListener("resize", onResize);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, []);
+
+  return (
+    <>
+      <canvas
+        ref={trailRef}
+        aria-hidden
+        role="presentation"
+        style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 30 }}
+      />
+      <canvas
+        ref={headRef}
+        aria-hidden
+        role="presentation"
+        style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 31 }}
+      />
+    </>
+  );
 }

@@ -19,6 +19,13 @@
   --btn-pad-y: 8px;
   --btn-pad-x: 14px;
   --btn-fw: 600;
+  /* Skystreaks (light theme defaults): bright fiery oranges with strong glow */
+  --streak-core: #fff6dd;     /* hot core */
+  --streak-main: #ff6a00;     /* orange */
+  --streak-edge: #ff2d00;     /* red edge */
+  --streak-glow: #ffd067;     /* warm halo */
+  --streak-opacity: 0.88;
+  --streak-bloom: 1.35;
 }
 
 /* Dark theme: neon pink/blue gradient */
@@ -37,6 +44,13 @@
   --btn-bg-hover: rgba(255, 255, 255, 0.10);
   --btn-bg-active: rgba(255, 255, 255, 0.14);
   --btn-border: rgba(255, 255, 255, 0.24);
+  /* Skystreaks (dark theme): cooler/neon variant, softer glow */
+  --streak-core: #bfe6ff;
+  --streak-main: #33aaff;
+  --streak-edge: #a94dff;
+  --streak-glow: #7bd0ff;
+  --streak-opacity: 0.6;
+  --streak-bloom: 0.7;
 }
 
 html,

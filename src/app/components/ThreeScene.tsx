@@ -275,24 +275,35 @@ export default function ThreeScene() {
     type GeoJSONFeatureCollection = { features: GeoJSONFeature[] };
 
     async function loadGeoJSONCountries() {
+      // Prefer remote canonical dataset first, then local override.
       const urls = [
-        "/geo/countries-110m.geojson", // try local if provided
         "https://raw.githubusercontent.com/johan/world.geo.json/master/countries.geo.json",
+        "/geo/countries-110m.geojson",
       ];
       let data: GeoJSONFeatureCollection | null = null;
       for (const url of urls) {
         try {
           const controller = new AbortController();
-          const to = url.startsWith('http') ? setTimeout(() => controller.abort(), 1500) : null;
+          const isRemote = url.startsWith('http');
+          const to = isRemote ? setTimeout(() => controller.abort(), 2200) : null;
           const res = await fetch(url, { cache: "force-cache", signal: controller.signal });
           if (to) clearTimeout(to);
           if (!res.ok) continue;
-          data = (await res.json()) as GeoJSONFeatureCollection;
+          const parsed = (await res.json()) as GeoJSONFeatureCollection;
+          const count = parsed?.features?.length ?? 0;
+          // Guard: skip tiny/placeholder files (< 100 features)
+          if (!count || count < 100) {
+            console.warn(`GeoJSON: dataset from ${url} has too few features (${count}), trying next source...`);
+            continue;
+          }
+          data = parsed;
           break;
-        } catch { /* try next */ }
+        } catch {
+          /* try next */
+        }
       }
       if (!data || !data.features) {
-        console.warn("GeoJSON: no data loaded. Add public/geo/countries-110m.geojson or ensure remote fetch is allowed.");
+        console.warn("GeoJSON: no valid dataset loaded. Provide public/geo/countries-110m.geojson or allow remote fetch.");
         return;
       }
 

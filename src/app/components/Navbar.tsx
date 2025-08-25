@@ -18,6 +18,7 @@ export default function Navbar() {
       >
         {label}
       </Link>
+      
     );
   };
 
@@ -45,6 +46,7 @@ export default function Navbar() {
           color: "var(--header-fg)",
         }}
       >
+                <ThemeToggle />
         <Link
           href="/"
           style={{
@@ -58,7 +60,6 @@ export default function Navbar() {
         </Link>
 
         {/* Кнопка переключения темы — внутри компонента желательно задать className="btn" */}
-        <ThemeToggle />
 
         <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
           <NavLink href="/" label="Home" />

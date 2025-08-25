@@ -33,52 +33,89 @@ function setSRGB(tex: THREE.Texture) {
 }
 
 export async function loadPlanetTexture({ renderer, signal }: LoadOpts): Promise<THREE.Texture> {
-  // Try KTX2 first (if available), then JPG/PNG
-  const ktx2Candidates = [
-    "/textures/earth.ktx2",
-    "/tex/earth.ktx2",
-  ];
-  const imgCandidates = [
-    "/textures/earth.jpg",
-    "/tex/earth.jpg",
-    // remote fallback (small)
+  // Strategy: avoid dev 404 noise by preferring remote in development.
+  // Override with NEXT_PUBLIC_TEXTURE_SOURCE=local to force local-first.
+  const isDev = process.env.NODE_ENV !== "production";
+  const forceLocal = process.env.NEXT_PUBLIC_TEXTURE_SOURCE === "local";
+  const preferRemote = isDev && !forceLocal;
+
+  // KTX2: skip probing in dev unless forced local
+  const ktx2Local: string[] = ["/textures/earth.ktx2", "/tex/earth.ktx2"];
+  const ktx2Candidates: string[] = preferRemote ? [] : ktx2Local;
+
+  // Images: order depends on environment
+  const imgRemote: string[] = [
+    // CORS-friendly CDNs (pinned)
+    "https://unpkg.com/three-globe@2.31.7/example/img/earth-blue-marble.jpg",
+    "https://unpkg.com/three-globe@2.31.7/example/img/earth-dark.jpg",
     "https://raw.githubusercontent.com/mentalisit/assets/main/earth/earthmap1k.jpg",
   ];
+  const imgLocal: string[] = ["/textures/earth.jpg", "/tex/earth.jpg"];
+  const imgCandidates: string[] = preferRemote ? [...imgRemote, ...imgLocal] : [...imgLocal, ...imgRemote];
+
+  // Quick availability probe to avoid long stalls on dead URLs
+  async function probe(url: string, timeoutMs = 1500): Promise<boolean> {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      // Some servers disallow HEAD; fallback to GET if HEAD fails quickly
+      try {
+        const r = await fetch(url, { method: "HEAD", cache: "no-store", signal: controller.signal });
+        if (r.ok) return true;
+      } catch {
+        const r2 = await fetch(url, { method: "GET", cache: "no-store", signal: controller.signal });
+        if (r2.ok) return true;
+      }
+    } catch {
+      /* not available */
+    } finally {
+      clearTimeout(id);
+    }
+    return false;
+  }
+
+  async function firstAvailable(urls: string[]): Promise<string | null> {
+    for (const url of urls) {
+      // Prefer probing remote URLs; same-origin is typically fast
+      const isRemote = /^https?:\/\//i.test(url);
+      const ok = await probe(url, isRemote ? 1500 : 600);
+      if (ok) return url;
+    }
+    return null;
+  }
 
   // Attempt KTX2
   try {
     const { KTX2Loader } = await import("three/examples/jsm/loaders/KTX2Loader.js");
     const ktx2 = new KTX2Loader();
-    // Use CDN transcoder as safe default; replace with local path if you host it
     ktx2.setTranscoderPath("https://unpkg.com/three@0.165.0/examples/jsm/libs/basis/");
     ktx2.detectSupport(renderer);
 
-    for (const url of ktx2Candidates) {
-      try {
-        // KTX2Loader doesn't support AbortSignal; ignore if aborted
-        if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
-        const tex = await ktx2.loadAsync(url);
-        setSRGB(tex);
-        // Setup sampling
-        tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-        tex.minFilter = THREE.LinearMipmapLinearFilter;
-        tex.magFilter = THREE.LinearFilter;
-        return tex;
-      } catch {
-        /* try next */
-      }
+    const ktx2Url = await firstAvailable(ktx2Candidates);
+    if (ktx2Url) {
+      if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+      const tex = await ktx2.loadAsync(ktx2Url);
+      setSRGB(tex);
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      tex.minFilter = THREE.LinearMipmapLinearFilter;
+      tex.magFilter = THREE.LinearFilter;
+      return tex;
     }
   } catch {
-    // KTX2Loader not available or failed; fall back to image
+    // KTX2Loader not available or KTX2 failed; fall back to image
   }
 
   // Fallback: standard image texture
   // TextureLoader has no native AbortSignal; if aborted, return placeholder
   if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
   const loader = new THREE.TextureLoader();
-  for (const url of imgCandidates) {
+  // Enable cross-origin for remote textures
+  (loader as unknown as { setCrossOrigin?: (v: string) => void }).setCrossOrigin?.("anonymous");
+
+  const imgUrl = await firstAvailable(imgCandidates);
+  if (imgUrl) {
     try {
-      const tex = await loader.loadAsync(url);
+      const tex = await loader.loadAsync(imgUrl);
       setSRGB(tex);
       tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
       tex.minFilter = THREE.LinearMipmapLinearFilter;
@@ -86,7 +123,7 @@ export async function loadPlanetTexture({ renderer, signal }: LoadOpts): Promise
       tex.generateMipmaps = true;
       return tex;
     } catch {
-      /* try next */
+      // fall through to placeholder
     }
   }
 
